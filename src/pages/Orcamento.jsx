@@ -164,8 +164,8 @@ function OrcamentoDetalhe({ orc, onVoltar, onUpdate }) {
   const [secoes, setSecoes]     = useState(orc.secoes||[])
   const [novaSecao, setNovaSecao] = useState('')
 
-  // Receber artigo vindo da Biblioteca
-  useEffect(() => {
+  // Receber artigo vindo da Biblioteca — corre ao montar e em focus
+  const processarPendente = () => {
     const raw = localStorage.getItem('orc_pendente_artigo')
     if (!raw) return
     try {
@@ -186,6 +186,12 @@ function OrcamentoDetalhe({ orc, onVoltar, onUpdate }) {
         return novas
       })
     } catch(e) { localStorage.removeItem('orc_pendente_artigo') }
+  }
+
+  useEffect(() => {
+    processarPendente()
+    window.addEventListener('focus', processarPendente)
+    return () => window.removeEventListener('focus', processarPendente)
   }, [])
 
   // Sincronizar secoes quando orc muda externamente

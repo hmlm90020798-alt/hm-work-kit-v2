@@ -263,7 +263,7 @@ export default function Biblioteca() {
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
                 {filtered.map(art=>(
-                  <CardArtigo key={art.id} art={art} onEdit={openEdit} onDel={delArt} onStar={toggleStar} orcContexto={orcContexto} onAddOrc={addToOrc} />
+                  <CardArtigo key={art.id} art={art} onEdit={openEdit} onDel={delArt} onStar={toggleStar} orcContexto={orcContexto} onAddOrc={addToOrc} search={search} />
                 ))}
               </div>
             )}
@@ -328,6 +328,19 @@ export default function Biblioteca() {
   )
 }
 
+function Highlight({ text, query }) {
+  if (!query || !text) return <span>{text}</span>
+  const idx = text.toLowerCase().indexOf(query.toLowerCase())
+  if (idx === -1) return <span>{text}</span>
+  return (
+    <span>
+      {text.slice(0, idx)}
+      <mark style={{background:"rgba(196,169,106,0.3)",color:"#C4A96A",borderRadius:"2px",padding:"0 1px"}}>{text.slice(idx, idx+query.length)}</mark>
+      {text.slice(idx+query.length)}
+    </span>
+  )
+}
+
 function CopyRef({ refCode }) {
   const [copied, setCopied] = useState(false)
   const copy = (e) => {
@@ -356,7 +369,7 @@ function CopyRef({ refCode }) {
   )
 }
 
-function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc }) {
+function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, search }) {
   const [open, setOpen] = useState(false)
   const isStar = art.star
   const label = [art.cat, art.sub].filter(Boolean).join(' · ')
@@ -388,8 +401,8 @@ function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc }) {
             <CopyRef refCode={art.ref} />
             {art.sub && <span style={{fontSize:'10px',padding:'1px 7px',borderRadius:'20px',background:'rgba(196,169,106,0.08)',color:'rgba(196,169,106,0.6)',flexShrink:0}}>{art.sub}</span>}
           </div>
-          <div style={{fontSize:'12.5px',color:'rgba(255,255,255,0.75)',lineHeight:1.4,whiteSpace:open?'normal':'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{art.desc}</div>
-          {art.supplier && <div style={{fontSize:'10.5px',color:'rgba(255,255,255,0.28)',marginTop:'2px'}}>{art.supplier}</div>}
+          <div style={{fontSize:'12.5px',color:'rgba(255,255,255,0.75)',lineHeight:1.4,whiteSpace:open?'normal':'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}><Highlight text={art.desc} query={search}/></div>
+          {art.supplier && <div style={{fontSize:'10.5px',color:'rgba(255,255,255,0.28)',marginTop:'2px'}}><Highlight text={art.supplier} query={search}/></div>}
         </div>
 
         <div style={{display:'flex',alignItems:'center',gap:'6px',flexShrink:0}}>
