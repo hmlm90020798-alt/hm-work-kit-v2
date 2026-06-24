@@ -103,7 +103,7 @@ function App() {
         <main style={{ flex: 1, overflow: 'auto' }}>
           <Routes>
             <Route path="/" element={<Placeholder label="Início" />} />
-            <Route path="/biblioteca" element={<Biblioteca />} />
+            <Route path="/biblioteca" element={<Biblioteca key="biblioteca" />} />
             <Route path="/biblioteca/:nome" element={<Categoria />} />
             <Route path="/tampos" element={<Placeholder label="Tampos" />} />
             <Route path="/mao-de-obra" element={<Placeholder label="Mão de obra" />} />
