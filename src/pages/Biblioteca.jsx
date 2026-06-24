@@ -69,6 +69,9 @@ const INPUT_STYLE = {
 
 export default function Biblioteca() {
   const navigate = useNavigate()
+  const [orcContexto, setOrcContexto] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('orc_contexto')) } catch { return null }
+  })
   const [cats, setCats]           = useState([])
   const [arts, setArts]           = useState([])
   const [activeCat, setActiveCat] = useState(null)
@@ -141,9 +144,29 @@ export default function Biblioteca() {
 
   const countFor = (name) => arts.filter(a=>a.cat===name).length
 
+  const addToOrc = (art) => {
+    if (!orcContexto) return
+    const artigo = { ref: art.ref, desc: art.desc, preco: art.price||0, supplier: art.supplier||'', cat: art.cat||'', sub: art.sub||'', link: art.link||'' }
+    localStorage.setItem('orc_pendente_artigo', JSON.stringify({ secaoId: orcContexto.secaoId, artigo }))
+    localStorage.removeItem('orc_contexto')
+    setOrcContexto(null)
+    navigate('/orcamento')
+  }
+
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
 
+      {/* BANNER ORÇAMENTO ATIVO */}
+      {orcContexto && (
+        <div style={{background:'rgba(196,169,106,0.08)',borderBottom:'0.5px solid rgba(196,169,106,0.2)',padding:'0.5rem 1.25rem',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+          <span style={{fontSize:'12px',color:'#C4A96A',flex:1}}>
+            A adicionar para: <strong>{orcContexto.secaoNome}</strong>
+          </span>
+          <button onClick={()=>{localStorage.removeItem('orc_contexto');setOrcContexto(null);navigate('/orcamento')}} style={{height:'26px',padding:'0 0.75rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.25)',background:'transparent',fontSize:'11px',color:'rgba(196,169,106,0.6)',cursor:'pointer'}}>
+            Cancelar
+          </button>
+        </div>
+      )}
       {/* TOPBAR */}
       <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0 1.25rem',height:'52px',borderBottom:'0.5px solid rgba(255,255,255,0.06)',flexShrink:0,background:'rgba(13,13,15,0.95)',backdropFilter:'blur(12px)'}}>
         {!vistaHome && (
@@ -240,7 +263,7 @@ export default function Biblioteca() {
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
                 {filtered.map(art=>(
-                  <CardArtigo key={art.id} art={art} onEdit={openEdit} onDel={delArt} onStar={toggleStar} />
+                  <CardArtigo key={art.id} art={art} onEdit={openEdit} onDel={delArt} onStar={toggleStar} orcContexto={orcContexto} onAddOrc={addToOrc} />
                 ))}
               </div>
             )}
@@ -333,7 +356,7 @@ function CopyRef({ refCode }) {
   )
 }
 
-function CardArtigo({ art, onEdit, onDel, onStar }) {
+function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc }) {
   const [open, setOpen] = useState(false)
   const isStar = art.star
   const label = [art.cat, art.sub].filter(Boolean).join(' · ')
@@ -373,6 +396,11 @@ function CardArtigo({ art, onEdit, onDel, onStar }) {
           {art.price>0 && <span style={{fontSize:'13px',fontWeight:500,color:'#C4A96A'}}>{Number(art.price).toFixed(2)} €</span>}
           {art.link && (
             <a href={art.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',textDecoration:'none',padding:'4px 7px',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'6px'}}>↗</a>
+          )}
+          {orcContexto && (
+            <button onClick={e=>{e.stopPropagation();onAddOrc(art)}} style={{height:'26px',padding:'0 0.75rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.35)',background:'rgba(196,169,106,0.1)',fontSize:'11px',color:'#C4A96A',cursor:'pointer',whiteSpace:'nowrap'}}>
+              + Orçamento
+            </button>
           )}
           <button onClick={e=>{e.stopPropagation();onStar(art)}} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:'14px',color:isStar?'#f0c040':'rgba(255,255,255,0.2)',padding:'4px'}}>{isStar?'★':'☆'}</button>
           <button onClick={e=>{e.stopPropagation();onEdit(art)}} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:'13px',color:'rgba(255,255,255,0.3)',padding:'4px'}}>✎</button>
