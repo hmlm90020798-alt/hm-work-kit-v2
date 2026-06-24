@@ -111,7 +111,7 @@ function App() {
             <Route path="/bundles" element={<Placeholder label="Bundles" />} />
             <Route path="/kits" element={<Placeholder label="Kits" />} />
             <Route path="/projectos" element={<Placeholder label="Projectos" />} />
-            <Route path="/orcamento" element={<Placeholder label="Orçamento" />} />
+            <Route path="/orcamento" element={<Orcamento />} />
             <Route path="/proposta" element={<Placeholder label="Proposta" />} />
             <Route path="/kc" element={<Placeholder label="KC" />} />
           </Routes>
