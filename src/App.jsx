@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import './index.css'
 import Biblioteca from './pages/Biblioteca'
+import Categoria from './pages/Categoria'
 
 const navSections = [
   {
@@ -103,6 +104,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Placeholder label="Início" />} />
             <Route path="/biblioteca" element={<Biblioteca />} />
+            <Route path="/biblioteca/:nome" element={<Categoria />} />
             <Route path="/tampos" element={<Placeholder label="Tampos" />} />
             <Route path="/mao-de-obra" element={<Placeholder label="Mão de obra" />} />
             <Route path="/bundles" element={<Placeholder label="Bundles" />} />

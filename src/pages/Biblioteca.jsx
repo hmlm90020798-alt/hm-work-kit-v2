@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
 import { collection, getDocs } from 'firebase/firestore'
 
@@ -135,6 +136,7 @@ function CardKit({ kit, onClick }) {
 }
 
 export default function Biblioteca() {
+  const navigate = useNavigate()
   const [artigos, setArtigos] = useState([])
   const [pesquisa, setPesquisa] = useState('')
 
@@ -216,7 +218,7 @@ export default function Biblioteca() {
         marginBottom: '1.75rem',
       }}>
         {categoriasFiltradas.map(cat => (
-          <CardCategoria key={cat.id} cat={cat} count={contarPorCategoria(cat.id)} onClick={() => {}} />
+          <CardCategoria key={cat.id} cat={cat} count={contarPorCategoria(cat.id)} onClick={() => navigate(`/biblioteca/${encodeURIComponent(cat.nome)}`)} />
         ))}
         <div style={{
           background: 'transparent',
