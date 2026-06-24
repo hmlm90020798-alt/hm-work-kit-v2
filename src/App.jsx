@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import './index.css'
+import Biblioteca from './pages/Biblioteca'
 
 const navSections = [
   {
@@ -101,7 +102,7 @@ function App() {
         <main style={{ flex: 1, overflow: 'auto' }}>
           <Routes>
             <Route path="/" element={<Placeholder label="Início" />} />
-            <Route path="/biblioteca" element={<Placeholder label="Biblioteca" />} />
+            <Route path="/biblioteca" element={<Biblioteca />} />
             <Route path="/tampos" element={<Placeholder label="Tampos" />} />
             <Route path="/mao-de-obra" element={<Placeholder label="Mão de obra" />} />
             <Route path="/bundles" element={<Placeholder label="Bundles" />} />
