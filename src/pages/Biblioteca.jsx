@@ -73,6 +73,7 @@ export default function Biblioteca() {
   const [orcContexto, setOrcContexto] = useState(() => {
     try { return JSON.parse(localStorage.getItem('orc_contexto')) } catch { return null }
   })
+  const [adicionados, setAdicionados] = useState(0)
   const [cats, setCats]           = useState([])
   const [arts, setArts]           = useState([])
   const [activeCat, setActiveCat] = useState(null)
@@ -163,9 +164,14 @@ export default function Biblioteca() {
         return { ...s, itens: [...(s.itens||[]), { ...artigo, qty:1 }] }
       })
       await updateDoc(orcRef, { secoes, updatedAt: serverTimestamp() })
+      setAdicionados(n => n+1)
     } catch(e) { console.error(e) }
+  }
+
+  const voltarOrcamento = () => {
     localStorage.removeItem('orc_contexto')
     setOrcContexto(null)
+    setAdicionados(0)
     navigate('/orcamento')
   }
 
@@ -177,8 +183,12 @@ export default function Biblioteca() {
         <div style={{background:'rgba(196,169,106,0.08)',borderBottom:'0.5px solid rgba(196,169,106,0.2)',padding:'0.5rem 1.25rem',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
           <span style={{fontSize:'12px',color:'#C4A96A',flex:1}}>
             A adicionar para: <strong>{orcContexto.secaoNome}</strong>
+            {adicionados>0 && <span style={{marginLeft:'8px',fontSize:'11px',background:'rgba(196,169,106,0.2)',padding:'1px 8px',borderRadius:'20px'}}>{adicionados} adicionado{adicionados>1?'s':''}</span>}
           </span>
-          <button onClick={()=>{localStorage.removeItem('orc_contexto');setOrcContexto(null);navigate('/orcamento')}} style={{height:'26px',padding:'0 0.75rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.25)',background:'transparent',fontSize:'11px',color:'rgba(196,169,106,0.6)',cursor:'pointer'}}>
+          <button onClick={voltarOrcamento} style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.4)',background:'rgba(196,169,106,0.15)',fontSize:'11px',color:'#C4A96A',cursor:'pointer',fontWeight:500}}>
+            ← Voltar ao orçamento
+          </button>
+          <button onClick={()=>{localStorage.removeItem('orc_contexto');setOrcContexto(null);setAdicionados(0)}} style={{height:'28px',padding:'0 0.75rem',borderRadius:'6px',border:'0.5px solid rgba(255,255,255,0.08)',background:'transparent',fontSize:'11px',color:'rgba(255,255,255,0.3)',cursor:'pointer'}}>
             Cancelar
           </button>
         </div>
