@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import CopyRef from '../components/CopyRef'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
-import { collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore'
+import CopyRef from '../components/CopyRef'
 
 const ESTADOS = {
   curso:    { label: 'Em curso',  cor: 'rgba(196,169,106,0.8)' },
@@ -46,9 +46,9 @@ function calcTotal(secoes) {
 
 export default function Orcamento() {
   const [orcamentos, setOrcamentos] = useState([])
-  const [orcAtivo, setOrcAtivo]     = useState(null)
+  const [orcAtivoId, setOrcAtivoId] = useState(null)
   const [novoModal, setNovoModal]   = useState(false)
-  const [form, setForm] = useState({ nome:'', contacto:'', pc:'', estado:'curso' })
+  const [form, setForm] = useState({ nome:'', contacto:'', pc:'' })
 
   useEffect(() => {
     const u = onSnapshot(collection(db,'orcamentos'), snap => {
@@ -65,25 +65,22 @@ export default function Orcamento() {
       createdAt:serverTimestamp(), updatedAt:serverTimestamp(),
     })
     setNovoModal(false)
-    setForm({ nome:'', contacto:'', pc:'', estado:'curso' })
-    setOrcAtivo({ id:ref.id, ...form, secoes:[], estado:'curso' })
+    setForm({ nome:'', contacto:'', pc:'' })
+    setOrcAtivoId(ref.id)
   }
 
   const delOrcamento = async (id, nome) => {
     if (!confirm(`Eliminar "${nome||'sem nome'}"?`)) return
     await deleteDoc(doc(db,'orcamentos',id))
-    if (orcAtivo?.id===id) setOrcAtivo(null)
+    if (orcAtivoId===id) setOrcAtivoId(null)
   }
 
-  const updateOrcamento = async (id, data) => {
-    await updateDoc(doc(db,'orcamentos',id), {...data, updatedAt:serverTimestamp()})
-  }
+  const orcAtivo = orcamentos.find(o=>o.id===orcAtivoId)
 
   if (orcAtivo) return (
     <OrcamentoDetalhe
-      orc={orcamentos.find(o=>o.id===orcAtivo.id) || orcAtivo}
-      onVoltar={()=>setOrcAtivo(null)}
-      onUpdate={(data)=>updateOrcamento(orcAtivo.id, data)}
+      orc={orcAtivo}
+      onVoltar={()=>setOrcAtivoId(null)}
     />
   )
 
@@ -106,7 +103,7 @@ export default function Orcamento() {
               const total = calcTotal(orc.secoes)
               const estado = ESTADOS[orc.estado] || ESTADOS.curso
               return (
-                <div key={orc.id} onClick={()=>setOrcAtivo(orc)}
+                <div key={orc.id} onClick={()=>setOrcAtivoId(orc.id)}
                   style={{background:'rgba(255,255,255,0.03)',backdropFilter:'blur(12px)',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'12px',padding:'1rem 1.25rem',cursor:'pointer',display:'grid',gridTemplateColumns:'1fr auto',gap:'1rem',alignItems:'center',transition:'all 0.15s',position:'relative',overflow:'hidden'}}
                   onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.06)';e.currentTarget.style.borderColor='rgba(196,169,106,0.2)'}}
                   onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.03)';e.currentTarget.style.borderColor='rgba(255,255,255,0.07)'}}
@@ -160,72 +157,37 @@ export default function Orcamento() {
   )
 }
 
-function OrcamentoDetalhe({ orc, onVoltar, onUpdate }) {
+function OrcamentoDetalhe({ orc, onVoltar }) {
   const navigate = useNavigate()
-  const [secoes, setSecoes]     = useState(orc.secoes||[])
   const [novaSecao, setNovaSecao] = useState('')
 
-  // Receber artigo vindo da Biblioteca — corre ao montar e em focus
-  const processarPendente = () => {
-    const raw = localStorage.getItem('orc_pendente_artigo')
-    if (!raw) return
-    try {
-      const { secaoId, artigo } = JSON.parse(raw)
-      localStorage.removeItem('orc_pendente_artigo')
-      setSecoes(prev => {
-        const novas = prev.map(s => {
-          if (s.id !== secaoId) return s
-          const idx = (s.itens||[]).findIndex(i => i.ref === artigo.ref)
-          if (idx >= 0) {
-            const itens = [...s.itens]
-            itens[idx] = { ...itens[idx], qty: (itens[idx].qty||1)+1 }
-            return { ...s, itens }
-          }
-          return { ...s, itens: [...(s.itens||[]), { ...artigo, qty:1 }] }
-        })
-        onUpdate({ secoes: novas })
-        return novas
-      })
-    } catch(e) { localStorage.removeItem('orc_pendente_artigo') }
-  }
-
-  useEffect(() => {
-    processarPendente()
-    window.addEventListener('focus', processarPendente)
-    return () => window.removeEventListener('focus', processarPendente)
-  }, [])
-
-  // Sincronizar secoes quando orc muda externamente
-  useEffect(() => { setSecoes(orc.secoes||[]) }, [orc.id])
-
+  const secoes = orc.secoes || []
   const total = calcTotal(secoes)
 
-  const addSecao = () => {
+  const saveSecoes = async (novas) => {
+    await updateDoc(doc(db,'orcamentos',orc.id), { secoes: novas, updatedAt: serverTimestamp() })
+  }
+
+  const addSecao = async () => {
     if (!novaSecao.trim()) return
     const nova = { id: Date.now().toString(), nome: novaSecao.trim(), itens:[] }
-    const novas = [...secoes, nova]
-    setSecoes(novas)
-    onUpdate({ secoes: novas })
+    await saveSecoes([...secoes, nova])
     setNovaSecao('')
   }
 
-  const delSecao = (id) => {
-    const novas = secoes.filter(s=>s.id!==id)
-    setSecoes(novas)
-    onUpdate({ secoes: novas })
+  const delSecao = async (id) => {
+    await saveSecoes(secoes.filter(s=>s.id!==id))
   }
 
-  const delItem = (secaoId, idx) => {
+  const delItem = async (secaoId, idx) => {
     const novas = secoes.map(s => {
       if (s.id!==secaoId) return s
-      const itens = s.itens.filter((_,i)=>i!==idx)
-      return { ...s, itens }
+      return { ...s, itens: s.itens.filter((_,i)=>i!==idx) }
     })
-    setSecoes(novas)
-    onUpdate({ secoes: novas })
+    await saveSecoes(novas)
   }
 
-  const updateQty = (secaoId, idx, qty) => {
+  const updateQty = async (secaoId, idx, qty) => {
     if (qty<1) return
     const novas = secoes.map(s => {
       if (s.id!==secaoId) return s
@@ -233,8 +195,7 @@ function OrcamentoDetalhe({ orc, onVoltar, onUpdate }) {
       itens[idx] = { ...itens[idx], qty }
       return { ...s, itens }
     })
-    setSecoes(novas)
-    onUpdate({ secoes: novas })
+    await saveSecoes(novas)
   }
 
   const irBiblioteca = (secao) => {
@@ -274,8 +235,6 @@ function OrcamentoDetalhe({ orc, onVoltar, onUpdate }) {
           <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'1rem'}}>
             {secoes.map(secao => (
               <div key={secao.id} style={{background:'rgba(255,255,255,0.025)',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'10px',overflow:'hidden'}}>
-
-                {/* Cabeçalho secção */}
                 <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0.6rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.05)'}}>
                   <span style={{fontSize:'12px',fontWeight:500,color:'rgba(255,255,255,0.6)',flex:1}}>{secao.nome}</span>
                   <span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>{(secao.itens||[]).length} itens</span>
@@ -285,38 +244,33 @@ function OrcamentoDetalhe({ orc, onVoltar, onUpdate }) {
                   <button onClick={()=>delSecao(secao.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px',padding:'2px 6px'}}>✕</button>
                 </div>
 
-                {/* Botão adicionar artigo */}
                 <div style={{padding:'8px 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.04)'}}>
-                  <button
-                    onClick={()=>irBiblioteca(secao)}
-                    style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.3)',background:'rgba(196,169,106,0.06)',fontSize:'11.5px',color:'rgba(196,169,106,0.8)',cursor:'pointer'}}
-                  >
+                  <button onClick={()=>irBiblioteca(secao)} style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.3)',background:'rgba(196,169,106,0.06)',fontSize:'11.5px',color:'rgba(196,169,106,0.8)',cursor:'pointer'}}>
                     + Artigo da Biblioteca
                   </button>
                 </div>
 
-                {/* Lista de itens */}
                 {(secao.itens||[]).length===0 ? (
                   <div style={{padding:'0.75rem 1rem',fontSize:'12px',color:'rgba(255,255,255,0.2)'}}>
                     Nenhum artigo ainda.
                   </div>
                 ) : (
                   <>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 32px',padding:'0.4rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.04)'}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 90px 80px 32px',padding:'0.4rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.04)'}}>
                       {['Artigo','Qty','Total',''].map(h=>(
                         <span key={h} style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',letterSpacing:'0.06em',textTransform:'uppercase',textAlign:h==='Total'?'right':h===''?'center':'left'}}>{h}</span>
                       ))}
                     </div>
                     {(secao.itens||[]).map((item,idx)=>(
-                      <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 32px',alignItems:'center',padding:'0.5rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.03)'}}>
+                      <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 90px 80px 32px',alignItems:'center',padding:'0.5rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.03)'}}>
                         <div>
                           <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',marginBottom:'2px'}}>{item.desc}</div>
                           <CopyRef refCode={item.ref} />
                         </div>
                         <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
-                          <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)-1)} style={{width:'20px',height:'20px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                          <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)-1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
                           <span style={{fontSize:'12px',color:'rgba(255,255,255,0.6)',minWidth:'20px',textAlign:'center'}}>{item.qty||1}</span>
-                          <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)+1)} style={{width:'20px',height:'20px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                          <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)+1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
                         </div>
                         <span style={{fontSize:'12px',fontWeight:500,color:'#C4A96A',textAlign:'right'}}>{((item.preco||0)*(item.qty||1)).toFixed(2)} €</span>
                         <button onClick={()=>delItem(secao.id,idx)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'13px',textAlign:'center'}}>✕</button>

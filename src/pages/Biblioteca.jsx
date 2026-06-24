@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import CopyRef from '../components/CopyRef'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
-import { collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 
 const ICONES = {
   acessorios:'🔩', aquecimentoeconforto325:'🔥', caixilharia:'🪟',
@@ -145,10 +145,25 @@ export default function Biblioteca() {
 
   const countFor = (name) => arts.filter(a=>a.cat===name).length
 
-  const addToOrc = (art) => {
+  const addToOrc = async (art) => {
     if (!orcContexto) return
     const artigo = { ref: art.ref, desc: art.desc, preco: art.price||0, supplier: art.supplier||'', cat: art.cat||'', sub: art.sub||'', link: art.link||'' }
-    localStorage.setItem('orc_pendente_artigo', JSON.stringify({ secaoId: orcContexto.secaoId, artigo }))
+    try {
+      const orcRef = doc(db, 'orcamentos', orcContexto.orcId)
+      const snap = await getDoc(orcRef)
+      if (!snap.exists()) return
+      const secoes = (snap.data().secoes || []).map(s => {
+        if (s.id !== orcContexto.secaoId) return s
+        const idx = (s.itens||[]).findIndex(i => i.ref === artigo.ref)
+        if (idx >= 0) {
+          const itens = [...s.itens]
+          itens[idx] = { ...itens[idx], qty: (itens[idx].qty||1)+1 }
+          return { ...s, itens }
+        }
+        return { ...s, itens: [...(s.itens||[]), { ...artigo, qty:1 }] }
+      })
+      await updateDoc(orcRef, { secoes, updatedAt: serverTimestamp() })
+    } catch(e) { console.error(e) }
     localStorage.removeItem('orc_contexto')
     setOrcContexto(null)
     navigate('/orcamento')
