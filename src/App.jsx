@@ -37,9 +37,10 @@ function NavItemReset({ item }) {
   const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
 
   const handleClick = () => {
-    // Limpar estado de navegação ao clicar no menu
     if (item.to === '/orcamento') {
-      localStorage.removeItem('orc_ativo_id')
+      // Só limpa se não vem da biblioteca com artigo pendente
+      const contexto = localStorage.getItem('orc_contexto')
+      if (!contexto) localStorage.removeItem('orc_ativo_id')
       localStorage.removeItem('orc_contexto')
     }
     if (item.to === '/biblioteca') {
