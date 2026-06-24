@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import CopyRef from '../components/CopyRef'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
 import { collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore'
@@ -337,34 +338,6 @@ function Highlight({ text, query }) {
       {text.slice(0, idx)}
       <mark style={{background:"rgba(196,169,106,0.3)",color:"#C4A96A",borderRadius:"2px",padding:"0 1px"}}>{text.slice(idx, idx+query.length)}</mark>
       {text.slice(idx+query.length)}
-    </span>
-  )
-}
-
-function CopyRef({ refCode }) {
-  const [copied, setCopied] = useState(false)
-  const copy = (e) => {
-    e.stopPropagation()
-    navigator.clipboard.writeText(refCode).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
-  }
-  return (
-    <span
-      onClick={copy}
-      title="Copiar referência"
-      style={{
-        fontSize:'13px', fontWeight:600, fontFamily:'monospace', letterSpacing:'0.05em',
-        color: copied ? '#4dcfaa' : '#C4A96A',
-        cursor:'pointer', padding:'2px 6px', borderRadius:'6px',
-        background: copied ? 'rgba(77,207,170,0.1)' : 'transparent',
-        border: copied ? '0.5px solid rgba(77,207,170,0.3)' : '0.5px solid transparent',
-        transition:'all 0.2s', userSelect:'none', flexShrink:0,
-        boxShadow: copied ? '0 0 8px rgba(77,207,170,0.2)' : 'none',
-      }}
-    >
-      {copied ? '✓ copiado' : refCode}
     </span>
   )
 }

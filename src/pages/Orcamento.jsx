@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import CopyRef from '../components/CopyRef'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
 import { collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
@@ -309,8 +310,8 @@ function OrcamentoDetalhe({ orc, onVoltar, onUpdate }) {
                     {(secao.itens||[]).map((item,idx)=>(
                       <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 32px',alignItems:'center',padding:'0.5rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.03)'}}>
                         <div>
-                          <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)'}}>{item.desc}</div>
-                          {item.ref&&<div style={{fontSize:'10px',color:'rgba(196,169,106,0.5)',fontFamily:'monospace'}}>{item.ref}</div>}
+                          <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',marginBottom:'2px'}}>{item.desc}</div>
+                          <CopyRef refCode={item.ref} />
                         </div>
                         <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
                           <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)-1)} style={{width:'20px',height:'20px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
