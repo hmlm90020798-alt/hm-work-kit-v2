@@ -1,121 +1,119 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import './index.css'
+
+const navSections = [
+  {
+    label: 'Enciclopédia',
+    items: [
+      { to: '/biblioteca', label: 'Biblioteca' },
+      { to: '/tampos', label: 'Tampos' },
+      { to: '/mao-de-obra', label: 'Mão de obra' },
+      { to: '/bundles', label: 'Bundles' },
+      { to: '/kits', label: 'Kits' },
+    ]
+  },
+  {
+    label: 'Trabalho',
+    items: [
+      { to: '/projectos', label: 'Projectos' },
+      { to: '/orcamento', label: 'Orçamento' },
+      { to: '/proposta', label: 'Proposta' },
+    ]
+  },
+  {
+    label: 'Ferramentas',
+    items: [
+      { to: '/kc', label: 'KC' },
+    ]
+  }
+]
+
+function Sidebar() {
+  return (
+    <aside style={{
+      width: '200px',
+      flexShrink: 0,
+      padding: '1.25rem 0.75rem',
+      borderRight: '0.5px solid rgba(255,255,255,0.06)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '2px',
+      minHeight: '100vh',
+      position: 'sticky',
+      top: 0,
+    }}>
+      <div style={{
+        fontSize: '13px',
+        fontWeight: 600,
+        color: '#C4A96A',
+        padding: '0 0.5rem 1rem',
+        letterSpacing: '0.05em'
+      }}>
+        work kit
+      </div>
+      {navSections.map(section => (
+        <div key={section.label}>
+          <div style={{
+            fontSize: '9px',
+            letterSpacing: '0.1em',
+            color: 'rgba(255,255,255,0.25)',
+            padding: '0.75rem 0.5rem 0.3rem',
+            textTransform: 'uppercase'
+          }}>
+            {section.label}
+          </div>
+          {section.items.map(item => (
+            <NavLink key={item.to} to={item.to} style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: '9px',
+              padding: '0.45rem 0.75rem',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              color: isActive ? '#C4A96A' : 'rgba(255,255,255,0.45)',
+              background: isActive ? 'rgba(196,169,106,0.1)' : 'transparent',
+              border: isActive ? '0.5px solid rgba(196,169,106,0.2)' : '0.5px solid transparent',
+              textDecoration: 'none',
+              marginBottom: '2px',
+            })}>
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      ))}
+    </aside>
+  )
+}
+
+function Placeholder({ label }) {
+  return (
+    <div style={{ padding: '2rem', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>
+      {label} — em construção
+    </div>
+  )
+}
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <BrowserRouter basename="/hm-work-kit-v2">
+      <div style={{ display: 'flex', minHeight: '100vh' }}>
+        <Sidebar />
+        <main style={{ flex: 1, overflow: 'auto' }}>
+          <Routes>
+            <Route path="/" element={<Placeholder label="Início" />} />
+            <Route path="/biblioteca" element={<Placeholder label="Biblioteca" />} />
+            <Route path="/tampos" element={<Placeholder label="Tampos" />} />
+            <Route path="/mao-de-obra" element={<Placeholder label="Mão de obra" />} />
+            <Route path="/bundles" element={<Placeholder label="Bundles" />} />
+            <Route path="/kits" element={<Placeholder label="Kits" />} />
+            <Route path="/projectos" element={<Placeholder label="Projectos" />} />
+            <Route path="/orcamento" element={<Placeholder label="Orçamento" />} />
+            <Route path="/proposta" element={<Placeholder label="Proposta" />} />
+            <Route path="/kc" element={<Placeholder label="KC" />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
   )
 }
 
