@@ -305,6 +305,34 @@ export default function Biblioteca() {
   )
 }
 
+function CopyRef({ refCode }) {
+  const [copied, setCopied] = useState(false)
+  const copy = (e) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(refCode).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  return (
+    <span
+      onClick={copy}
+      title="Copiar referência"
+      style={{
+        fontSize:'13px', fontWeight:600, fontFamily:'monospace', letterSpacing:'0.05em',
+        color: copied ? '#4dcfaa' : '#C4A96A',
+        cursor:'pointer', padding:'2px 6px', borderRadius:'6px',
+        background: copied ? 'rgba(77,207,170,0.1)' : 'transparent',
+        border: copied ? '0.5px solid rgba(77,207,170,0.3)' : '0.5px solid transparent',
+        transition:'all 0.2s', userSelect:'none', flexShrink:0,
+        boxShadow: copied ? '0 0 8px rgba(77,207,170,0.2)' : 'none',
+      }}
+    >
+      {copied ? '✓ copiado' : refCode}
+    </span>
+  )
+}
+
 function CardArtigo({ art, onEdit, onDel, onStar }) {
   const [open, setOpen] = useState(false)
   const isStar = art.star
@@ -334,7 +362,7 @@ function CardArtigo({ art, onEdit, onDel, onStar }) {
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'2px'}}>
             {isStar && <span style={{color:'#f0c040',fontSize:'12px',flexShrink:0}}>★</span>}
-            <span style={{fontSize:'13px',fontWeight:600,color:'#C4A96A',fontFamily:'monospace',letterSpacing:'0.05em'}}>{art.ref}</span>
+            <CopyRef refCode={art.ref} />
             {art.sub && <span style={{fontSize:'10px',padding:'1px 7px',borderRadius:'20px',background:'rgba(196,169,106,0.08)',color:'rgba(196,169,106,0.6)',flexShrink:0}}>{art.sub}</span>}
           </div>
           <div style={{fontSize:'12.5px',color:'rgba(255,255,255,0.75)',lineHeight:1.4,whiteSpace:open?'normal':'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{art.desc}</div>
