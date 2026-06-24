@@ -46,7 +46,7 @@ function calcTotal(secoes) {
 
 export default function Orcamento() {
   const [orcamentos, setOrcamentos] = useState([])
-  const [orcAtivoId, setOrcAtivoId] = useState(null)
+  const [orcAtivoId, setOrcAtivoId] = useState(() => localStorage.getItem('orc_ativo_id') || null)
   const [novoModal, setNovoModal]   = useState(false)
   const [form, setForm] = useState({ nome:'', contacto:'', pc:'' })
 
