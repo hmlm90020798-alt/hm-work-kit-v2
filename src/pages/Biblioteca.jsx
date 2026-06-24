@@ -160,12 +160,12 @@ export default function Biblioteca() {
         </div>
 
         {/* Filtros */}
-        <select value={sort} onChange={e=>setSort(e.target.value)} style={{...BTN(),paddingRight:'0.5rem'}}>
+        <select value={sort} onChange={e=>setSort(e.target.value)} style={{height:'32px',padding:'0 0.75rem',borderRadius:'8px',border:'0.5px solid rgba(255,255,255,0.1)',background:'#1a1a1c',color:'rgba(255,255,255,0.65)',fontSize:'11.5px',cursor:'pointer',outline:'none'}}>
           {SORT_OPTS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
 
         {suppliersAvailable.length>0 && !vistaHome && (
-          <select value={supplierFilter} onChange={e=>setSupplierFilter(e.target.value)} style={{...BTN(),paddingRight:'0.5rem'}}>
+          <select value={supplierFilter} onChange={e=>setSupplierFilter(e.target.value)} style={{height:'32px',padding:'0 0.75rem',borderRadius:'8px',border:'0.5px solid rgba(255,255,255,0.1)',background:'#1a1a1c',color:'rgba(255,255,255,0.65)',fontSize:'11.5px',cursor:'pointer',outline:'none',maxWidth:'160px'}}>
             <option value=''>Todos os fornecedores</option>
             {suppliersAvailable.map(s=><option key={s} value={s}>{s}</option>)}
           </select>
@@ -181,19 +181,7 @@ export default function Biblioteca() {
         <button onClick={()=>setArtModal(true)||openAdd()} style={BTN_GOLD()}>+ Artigo</button>
       </div>
 
-      {/* CHIPS DE CATEGORIAS */}
-      {!vistaHome && (
-        <div style={{display:'flex',gap:'6px',padding:'8px 1.25rem',overflowX:'auto',flexShrink:0,borderBottom:'0.5px solid rgba(255,255,255,0.05)',scrollbarWidth:'none'}}>
-          <button onClick={()=>{setActiveCat(null);setActiveSub('');setVistaHome(false)}} style={{...BTN(activeCat===null&&!search?{background:'rgba(196,169,106,0.1)',borderColor:'rgba(196,169,106,0.3)',color:'#C4A96A'}:{}),borderRadius:'20px',height:'28px'}}>
-            Todos <span style={{opacity:0.5,fontSize:'10px',marginLeft:'4px'}}>{arts.length}</span>
-          </button>
-          {catsSorted.map(c=>(
-            <button key={c.id} onClick={()=>entrarCat(c.name)} style={{...BTN(activeCat===c.name?{background:'rgba(196,169,106,0.1)',borderColor:'rgba(196,169,106,0.3)',color:'#C4A96A'}:{}),borderRadius:'20px',height:'28px'}}>
-              {c.name} <span style={{opacity:0.5,fontSize:'10px',marginLeft:'4px'}}>{countFor(c.name)}</span>
-            </button>
-          ))}
-        </div>
-      )}
+
 
       {/* CHIPS DE SUBCATEGORIAS */}
       {!vistaHome && subs.length>0 && (
