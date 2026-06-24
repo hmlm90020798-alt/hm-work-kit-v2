@@ -36,12 +36,13 @@ const SORT_OPTS = [
 
 function sortArts(arts, sort) {
   return [...arts].sort((a,b) => {
-    if (a.star && !b.star) return -1
-    if (!a.star && b.star) return 1
     if (sort==='price_asc')  return (a.price||0)-(b.price||0)
     if (sort==='price_desc') return (b.price||0)-(a.price||0)
     if (sort==='supplier')   return (a.supplier||'').localeCompare(b.supplier||'')
     if (sort==='desc')       return (a.desc||'').localeCompare(b.desc||'')
+    // ordenação por ref — estrelas primeiro, apenas neste modo
+    if (a.star && !b.star) return -1
+    if (!a.star && b.star) return 1
     return (a.ref||'').localeCompare(b.ref||'')
   })
 }
