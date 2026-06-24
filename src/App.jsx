@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import './index.css'
 import Biblioteca from './pages/Biblioteca'
 import Categoria from './pages/Categoria'
+import Orcamento from './pages/Orcamento'
 
 const navSections = [
   {
