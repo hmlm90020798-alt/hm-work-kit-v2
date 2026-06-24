@@ -59,6 +59,8 @@ export default function Orcamento() {
     return u
   }, [])
 
+  const setOrcAtivo = (id) => { setOrcAtivoId(id); if (id) localStorage.setItem('orc_ativo_id', id); else localStorage.removeItem('orc_ativo_id') }
+
   const criarOrcamento = async () => {
     const ref = await addDoc(collection(db,'orcamentos'), {
       ...form, secoes:[], estado:'curso',
@@ -66,13 +68,13 @@ export default function Orcamento() {
     })
     setNovoModal(false)
     setForm({ nome:'', contacto:'', pc:'' })
-    setOrcAtivoId(ref.id)
+    setOrcAtivo(ref.id)
   }
 
   const delOrcamento = async (id, nome) => {
     if (!confirm(`Eliminar "${nome||'sem nome'}"?`)) return
     await deleteDoc(doc(db,'orcamentos',id))
-    if (orcAtivoId===id) setOrcAtivoId(null)
+    if (orcAtivoId===id) setOrcAtivo(null)
   }
 
   const orcAtivo = orcamentos.find(o=>o.id===orcAtivoId)
@@ -80,7 +82,7 @@ export default function Orcamento() {
   if (orcAtivo) return (
     <OrcamentoDetalhe
       orc={orcAtivo}
-      onVoltar={()=>setOrcAtivoId(null)}
+      onVoltar={()=>setOrcAtivo(null)}
     />
   )
 
@@ -103,7 +105,7 @@ export default function Orcamento() {
               const total = calcTotal(orc.secoes)
               const estado = ESTADOS[orc.estado] || ESTADOS.curso
               return (
-                <div key={orc.id} onClick={()=>setOrcAtivoId(orc.id)}
+                <div key={orc.id} onClick={()=>setOrcAtivo(orc.id)}
                   style={{background:'rgba(255,255,255,0.03)',backdropFilter:'blur(12px)',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'12px',padding:'1rem 1.25rem',cursor:'pointer',display:'grid',gridTemplateColumns:'1fr auto',gap:'1rem',alignItems:'center',transition:'all 0.15s',position:'relative',overflow:'hidden'}}
                   onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.06)';e.currentTarget.style.borderColor='rgba(196,169,106,0.2)'}}
                   onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.03)';e.currentTarget.style.borderColor='rgba(255,255,255,0.07)'}}
