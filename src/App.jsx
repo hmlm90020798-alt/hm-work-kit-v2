@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import './index.css'
 import Biblioteca from './pages/Biblioteca'
 import Categoria from './pages/Categoria'
@@ -30,6 +30,38 @@ const navSections = [
     ]
   }
 ]
+
+function NavItemReset({ item }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+
+  const handleClick = () => {
+    // Limpar estado de navegação ao clicar no menu
+    if (item.to === '/orcamento') {
+      localStorage.removeItem('orc_ativo_id')
+      localStorage.removeItem('orc_contexto')
+    }
+    if (item.to === '/biblioteca') {
+      localStorage.removeItem('orc_contexto')
+    }
+    navigate(item.to)
+  }
+
+  return (
+    <button onClick={handleClick} style={{
+      display: 'flex', alignItems: 'center', gap: '9px',
+      padding: '0.45rem 0.75rem', borderRadius: '8px',
+      fontSize: '12.5px', width: '100%', textAlign: 'left',
+      color: isActive ? '#C4A96A' : 'rgba(255,255,255,0.45)',
+      background: isActive ? 'rgba(196,169,106,0.1)' : 'transparent',
+      border: isActive ? '0.5px solid rgba(196,169,106,0.2)' : '0.5px solid transparent',
+      cursor: 'pointer', marginBottom: '2px',
+    }}>
+      {item.label}
+    </button>
+  )
+}
 
 function Sidebar() {
   return (
@@ -66,21 +98,7 @@ function Sidebar() {
             {section.label}
           </div>
           {section.items.map(item => (
-            <NavLink key={item.to} to={item.to} style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: '9px',
-              padding: '0.45rem 0.75rem',
-              borderRadius: '8px',
-              fontSize: '12.5px',
-              color: isActive ? '#C4A96A' : 'rgba(255,255,255,0.45)',
-              background: isActive ? 'rgba(196,169,106,0.1)' : 'transparent',
-              border: isActive ? '0.5px solid rgba(196,169,106,0.2)' : '0.5px solid transparent',
-              textDecoration: 'none',
-              marginBottom: '2px',
-            })}>
-              {item.label}
-            </NavLink>
+            <NavItemReset key={item.to} item={item} />
           ))}
         </div>
       ))}
