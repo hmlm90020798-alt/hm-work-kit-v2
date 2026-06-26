@@ -126,7 +126,7 @@ function App() {
             <Route path="/" element={<Placeholder label="Início" />} />
             <Route path="/biblioteca" element={<Biblioteca key="biblioteca" />} />
             <Route path="/biblioteca/:nome" element={<Categoria />} />
-            <Route path="/tampos" element={<Placeholder label="Tampos" />} />
+            <Route path="/tampos" element={<Tampos />} />
             <Route path="/mao-de-obra" element={<Placeholder label="Mão de obra" />} />
             <Route path="/bundles" element={<Placeholder label="Bundles" />} />
             <Route path="/kits" element={<Placeholder label="Kits" />} />
