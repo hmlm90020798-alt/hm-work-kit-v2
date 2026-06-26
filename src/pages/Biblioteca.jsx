@@ -74,6 +74,7 @@ export default function Biblioteca() {
     try { return JSON.parse(localStorage.getItem('orc_contexto')) } catch { return null }
   })
   const [adicionados, setAdicionados] = useState(0)
+  const [refsNaSecao, setRefsNaSecao] = useState(new Set())
   const [cats, setCats]           = useState([])
   const [arts, setArts]           = useState([])
   const [activeCat, setActiveCat] = useState(null)
@@ -87,6 +88,23 @@ export default function Biblioteca() {
   const [catModal, setCatModal]   = useState(false)
   const [editId, setEditId]       = useState(null)
   const [form, setForm] = useState({ ref:'',desc:'',cat:'',sub:'',price:'',supplier:'',link:'',notes:'',star:false })
+
+  // Carregar refs já existentes na secção ativa
+  useEffect(() => {
+    if (!orcContexto) return
+    const orcRef = doc(db, 'orcamentos', orcContexto.orcId)
+    const u = onSnapshot(orcRef, snap => {
+      if (!snap.exists()) return
+      const secao = (snap.data().secoes||[]).find(s => s.id === orcContexto.secaoId)
+      const refs = new Set()
+      ;(secao?.itens||[]).forEach(i => {
+        if (i.variantes) i.variantes.forEach(v => v.ref && refs.add(v.ref))
+        else if (i.ref) refs.add(i.ref)
+      })
+      setRefsNaSecao(refs)
+    })
+    return u
+  }, [orcContexto?.orcId, orcContexto?.secaoId])
 
   useEffect(() => {
     const u1 = onSnapshot(collection(db,'categorias'), snap => {
@@ -153,15 +171,36 @@ export default function Biblioteca() {
       const orcRef = doc(db, 'orcamentos', orcContexto.orcId)
       const snap = await getDoc(orcRef)
       if (!snap.exists()) return
+      const eVariante = orcContexto.varianteDeIdx !== undefined
+
       const secoes = (snap.data().secoes || []).map(s => {
         if (s.id !== orcContexto.secaoId) return s
-        const idx = (s.itens||[]).findIndex(i => i.ref === artigo.ref)
-        if (idx >= 0) {
-          const itens = [...s.itens]
-          itens[idx] = { ...itens[idx], qty: (itens[idx].qty||1)+1 }
-          return { ...s, itens }
+        const itens = [...(s.itens||[])]
+
+        if (eVariante) {
+          // Adicionar como variante B ao item existente
+          const item = {...itens[orcContexto.varianteDeIdx]}
+          if (!item.variantes) {
+            // Converter item simples em item com variantes
+            item.variantes = [
+              { ref: item.ref, desc: item.desc, preco: item.preco||0, supplier: item.supplier||'', ativa: true },
+              { ...artigo, ativa: false }
+            ]
+            delete item.ref; delete item.desc; delete item.preco; delete item.supplier
+          } else {
+            item.variantes = [...item.variantes, { ...artigo, ativa: false }]
+          }
+          itens[orcContexto.varianteDeIdx] = item
+        } else {
+          // Adicionar artigo normal
+          const idx = itens.findIndex(i => i.ref === artigo.ref)
+          if (idx >= 0) {
+            itens[idx] = { ...itens[idx], qty: (itens[idx].qty||1)+1 }
+          } else {
+            itens.push({ ...artigo, qty:1 })
+          }
         }
-        return { ...s, itens: [...(s.itens||[]), { ...artigo, qty:1 }] }
+        return { ...s, itens }
       })
       await updateDoc(orcRef, { secoes, updatedAt: serverTimestamp() })
       setAdicionados(n => n+1)
@@ -182,7 +221,7 @@ export default function Biblioteca() {
       {orcContexto && (
         <div style={{background:'rgba(196,169,106,0.08)',borderBottom:'0.5px solid rgba(196,169,106,0.2)',padding:'0.5rem 1.25rem',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
           <span style={{fontSize:'12px',color:'#C4A96A',flex:1}}>
-            A adicionar para: <strong>{orcContexto.secaoNome}</strong>
+            {orcContexto.varianteDeIdx !== undefined ? 'A adicionar variante para: ' : 'A adicionar para: '}<strong>{orcContexto.secaoNome}</strong>
             {adicionados>0 && <span style={{marginLeft:'8px',fontSize:'11px',background:'rgba(196,169,106,0.2)',padding:'1px 8px',borderRadius:'20px'}}>{adicionados} adicionado{adicionados>1?'s':''}</span>}
           </span>
           <button onClick={voltarOrcamento} style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.4)',background:'rgba(196,169,106,0.15)',fontSize:'11px',color:'#C4A96A',cursor:'pointer',fontWeight:500}}>
@@ -289,7 +328,7 @@ export default function Biblioteca() {
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
                 {filtered.map(art=>(
-                  <CardArtigo key={art.id} art={art} onEdit={openEdit} onDel={delArt} onStar={toggleStar} orcContexto={orcContexto} onAddOrc={addToOrc} search={search} />
+                  <CardArtigo key={art.id} art={art} onEdit={openEdit} onDel={delArt} onStar={toggleStar} orcContexto={orcContexto} onAddOrc={addToOrc} search={search} jaAdicionado={refsNaSecao.has(art.ref)} />
                 ))}
               </div>
             )}
@@ -367,7 +406,7 @@ function Highlight({ text, query }) {
   )
 }
 
-function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, search }) {
+function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, search, jaAdicionado }) {
   const [open, setOpen] = useState(false)
   const isStar = art.star
   const label = [art.cat, art.sub].filter(Boolean).join(' · ')
@@ -376,9 +415,10 @@ function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, search 
     <div
       onClick={()=>setOpen(!open)}
       style={{
-        background: open ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+        background: jaAdicionado ? 'rgba(77,207,170,0.04)' : open ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
         border: isStar
           ? '0.5px solid rgba(240,192,64,0.35)'
+          : jaAdicionado ? '0.5px solid rgba(77,207,170,0.3)'
           : open ? '0.5px solid rgba(255,255,255,0.1)' : '0.5px solid rgba(255,255,255,0.06)',
         borderLeft: isStar ? '2px solid #f0c040' : undefined,
         borderRadius:'10px',
@@ -409,8 +449,8 @@ function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, search 
             <a href={art.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',textDecoration:'none',padding:'4px 7px',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'6px'}}>↗</a>
           )}
           {orcContexto && (
-            <button onClick={e=>{e.stopPropagation();onAddOrc(art)}} style={{height:'26px',padding:'0 0.75rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.35)',background:'rgba(196,169,106,0.1)',fontSize:'11px',color:'#C4A96A',cursor:'pointer',whiteSpace:'nowrap'}}>
-              + Orçamento
+            <button onClick={e=>{e.stopPropagation();onAddOrc(art)}} style={{height:'26px',padding:'0 0.75rem',borderRadius:'6px',border:jaAdicionado?'0.5px solid rgba(77,207,170,0.4)':'0.5px solid rgba(196,169,106,0.35)',background:jaAdicionado?'rgba(77,207,170,0.1)':'rgba(196,169,106,0.1)',fontSize:'11px',color:jaAdicionado?'#4dcfaa':'#C4A96A',cursor:'pointer',whiteSpace:'nowrap'}}>
+              {jaAdicionado ? '✓ Adicionado' : '+ Orçamento'}
             </button>
           )}
           <button onClick={e=>{e.stopPropagation();onStar(art)}} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:'14px',color:isStar?'#f0c040':'rgba(255,255,255,0.2)',padding:'4px'}}>{isStar?'★':'☆'}</button>
@@ -425,7 +465,7 @@ function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, search 
             {label && <span style={{fontSize:'10px',padding:'2px 8px',borderRadius:'20px',background:'rgba(255,255,255,0.05)',color:'rgba(255,255,255,0.4)'}}>{label}</span>}
             {art.supplier && <span style={{fontSize:'10px',padding:'2px 8px',borderRadius:'20px',background:'rgba(255,255,255,0.05)',color:'rgba(255,255,255,0.4)'}}>{art.supplier}</span>}
           </div>
-          {art.notes && <div style={{fontSize:'12px',color:'rgba(255,255,255,0.45)',lineHeight:1.6}}>{art.notes}</div>}
+          {art.notes && <div style={{fontSize:'12px',color:'rgba(255,255,255,0.45)',lineHeight:1.6}}><Highlight text={art.notes} query={search}/></div>}
         </div>
       )}
     </div>

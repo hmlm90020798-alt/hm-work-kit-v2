@@ -3,6 +3,7 @@ import './index.css'
 import Biblioteca from './pages/Biblioteca'
 import Categoria from './pages/Categoria'
 import Orcamento from './pages/Orcamento'
+import Tampos from './pages/Tampos'
 
 const navSections = [
   {

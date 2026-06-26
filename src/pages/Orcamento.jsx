@@ -40,8 +40,13 @@ function formatData(ts) {
 function calcTotal(secoes) {
   if (!secoes) return 0
   return secoes.reduce((t, s) =>
-    t + (s.itens||[]).reduce((st, i) =>
-      st + ((i.preco||0) * (i.qty||1)), 0), 0)
+    t + (s.itens||[]).reduce((st, i) => {
+      if (i.variantes) {
+        const ativa = i.variantes.find(v=>v.ativa) || i.variantes[0]
+        return st + ((ativa?.preco||0) * (i.qty||1))
+      }
+      return st + ((i.preco||0) * (i.qty||1))
+    }, 0), 0)
 }
 
 export default function Orcamento() {
@@ -207,6 +212,44 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
     navigate('/biblioteca')
   }
 
+  const irBibliotecaVariante = (secao, itemIdx) => {
+    localStorage.setItem('orc_contexto', JSON.stringify({
+      orcId: orc.id, secaoId: secao.id, secaoNome: secao.nome,
+      varianteDeIdx: itemIdx
+    }))
+    navigate('/biblioteca')
+  }
+
+  const toggleVariante = async (secaoId, itemIdx, varIdx) => {
+    const novas = secoes.map(s => {
+      if (s.id !== secaoId) return s
+      const itens = [...s.itens]
+      const item = {...itens[itemIdx]}
+      if (item.variantes) {
+        item.variantes = item.variantes.map((v,i) => ({...v, ativa: i===varIdx}))
+      }
+      itens[itemIdx] = item
+      return {...s, itens}
+    })
+    await saveSecoes(novas)
+  }
+
+  const delVariante = async (secaoId, itemIdx, varIdx) => {
+    const novas = secoes.map(s => {
+      if (s.id !== secaoId) return s
+      const itens = [...s.itens]
+      const item = {...itens[itemIdx]}
+      if (item.variantes && item.variantes.length > 1) {
+        item.variantes = item.variantes.filter((_,i) => i!==varIdx)
+        // garantir que há sempre uma ativa
+        if (!item.variantes.some(v=>v.ativa)) item.variantes[0].ativa = true
+      }
+      itens[itemIdx] = item
+      return {...s, itens}
+    })
+    await saveSecoes(novas)
+  }
+
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
       <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0 1.25rem',height:'52px',borderBottom:'0.5px solid rgba(255,255,255,0.06)',flexShrink:0,background:'rgba(13,13,15,0.95)'}}>
@@ -263,21 +306,46 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
                         <span key={h} style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',letterSpacing:'0.06em',textTransform:'uppercase',textAlign:h==='Total'?'right':h===''?'center':'left'}}>{h}</span>
                       ))}
                     </div>
-                    {(secao.itens||[]).map((item,idx)=>(
-                      <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 90px 80px 32px',alignItems:'center',padding:'0.5rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.03)'}}>
-                        <div>
-                          <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',marginBottom:'2px'}}>{item.desc}</div>
-                          <CopyRef refCode={item.ref} />
+                    {(secao.itens||[]).map((item,idx)=>{
+                      const temVariantes = item.variantes && item.variantes.length > 1
+                      const ativa = temVariantes ? (item.variantes.find(v=>v.ativa)||item.variantes[0]) : item
+                      return (
+                        <div key={idx}>
+                          {/* Linha principal */}
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 90px 80px 100px 32px',alignItems:'center',padding:'0.5rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.03)'}}>
+                            <div>
+                              <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',marginBottom:'2px'}}>{ativa.desc||item.desc}</div>
+                              <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                                <CopyRef refCode={ativa.ref||item.ref} />
+                                {temVariantes && <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'20px',background:'rgba(196,169,106,0.1)',color:'#C4A96A'}}>A/B</span>}
+                              </div>
+                            </div>
+                            <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                              <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)-1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.6)',minWidth:'20px',textAlign:'center'}}>{item.qty||1}</span>
+                              <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)+1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                            </div>
+                            <span style={{fontSize:'12px',fontWeight:500,color:'#C4A96A',textAlign:'right'}}>{((ativa.preco||item.preco||0)*(item.qty||1)).toFixed(2)} €</span>
+                            <button onClick={()=>irBibliotecaVariante(secao,idx)} style={{height:'22px',padding:'0 6px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.03)',fontSize:'10px',color:'rgba(255,255,255,0.35)',cursor:'pointer',whiteSpace:'nowrap'}}>+ Variante</button>
+                            <button onClick={()=>delItem(secao.id,idx)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'13px',textAlign:'center'}}>✕</button>
+                          </div>
+                          {/* Variantes A/B */}
+                          {temVariantes && item.variantes.map((v,vi)=>(
+                            <div key={vi} onClick={()=>toggleVariante(secao.id,idx,vi)} style={{display:'grid',gridTemplateColumns:'1fr 80px 32px',alignItems:'center',padding:'0.35rem 1rem 0.35rem 2rem',borderBottom:'0.5px solid rgba(255,255,255,0.02)',cursor:'pointer',background:v.ativa?'rgba(77,207,170,0.04)':'rgba(255,255,255,0.01)',transition:'background 0.15s'}}>
+                              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                                <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'4px',background:v.ativa?'rgba(77,207,170,0.15)':'rgba(255,255,255,0.05)',color:v.ativa?'#4dcfaa':'rgba(255,255,255,0.3)',fontWeight:600}}>{vi===0?'A':'B'}</span>
+                                <div>
+                                  <div style={{fontSize:'11.5px',color:v.ativa?'rgba(255,255,255,0.75)':'rgba(255,255,255,0.35)'}}>{v.desc}</div>
+                                  <CopyRef refCode={v.ref} style={{fontSize:'10px'}} />
+                                </div>
+                              </div>
+                              <span style={{fontSize:'12px',fontWeight:500,color:v.ativa?'#4dcfaa':'rgba(255,255,255,0.3)',textAlign:'right'}}>{(v.preco||0).toFixed(2)} €</span>
+                              <button onClick={e=>{e.stopPropagation();delVariante(secao.id,idx,vi)}} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'12px',textAlign:'center'}}>✕</button>
+                            </div>
+                          ))}
                         </div>
-                        <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
-                          <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)-1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-                          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.6)',minWidth:'20px',textAlign:'center'}}>{item.qty||1}</span>
-                          <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)+1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
-                        </div>
-                        <span style={{fontSize:'12px',fontWeight:500,color:'#C4A96A',textAlign:'right'}}>{((item.preco||0)*(item.qty||1)).toFixed(2)} €</span>
-                        <button onClick={()=>delItem(secao.id,idx)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'13px',textAlign:'center'}}>✕</button>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </>
                 )}
               </div>
