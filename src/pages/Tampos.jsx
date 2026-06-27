@@ -241,13 +241,13 @@ function Calculadora({ current, setCurrent, onBack }) {
         </div>
 
         <div style={{padding:'0.75rem 1rem'}}>
-          <div style={{fontSize:'10px',color:'rgba(255,255,255,0.25)',marginBottom:'6px',letterSpacing:'0.05em',textTransform:'uppercase'}}>Segmentos (metros)</div>
+          <div style={{fontSize:'10px',color:'rgba(255,255,255,0.25)',marginBottom:'8px',letterSpacing:'0.05em',textTransform:'uppercase'}}>Segmentos (metros)</div>
           {(p.segmentos||[]).map(seg=>(
-            <div key={seg.id} style={{display:'grid',gridTemplateColumns:'1fr 80px 80px 52px 24px',gap:'6px',alignItems:'center',marginBottom:'6px'}}>
-              <input value={seg.label||''} onChange={e=>isB?null:updSeg(p.id,seg.id,'label',e.target.value)} style={{...INPUT,height:'30px',fontSize:'11px'}}/>
-              <input type="number" value={seg.comp||''} onChange={e=>isB?null:updSeg(p.id,seg.id,'comp',e.target.value)} placeholder="Comp" style={{...INPUT,height:'30px',fontSize:'11px'}}/>
-              <input type="number" value={seg.larg||''} onChange={e=>isB?null:updSeg(p.id,seg.id,'larg',e.target.value)} placeholder="Larg" style={{...INPUT,height:'30px',fontSize:'11px'}}/>
-              <div style={{textAlign:'right',fontSize:'12px',fontWeight:500,color:accentColor}}>{f2((parseFloat(seg.comp)||0)*(parseFloat(seg.larg)||0))}</div>
+            <div key={seg.id} style={{display:'grid',gridTemplateColumns:'1fr 120px 120px 70px 24px',gap:'8px',alignItems:'center',marginBottom:'8px'}}>
+              <input value={seg.label||''} onChange={e=>isB?null:updSeg(p.id,seg.id,'label',e.target.value)} style={{...INPUT,height:'38px',fontSize:'12px'}}/>
+              <input type="number" value={seg.comp||''} onChange={e=>isB?null:updSeg(p.id,seg.id,'comp',e.target.value)} placeholder="Comp. (m)" step="0.01" style={{...INPUT,height:'38px',fontSize:'13px',fontWeight:500,textAlign:'right'}}/>
+              <input type="number" value={seg.larg||''} onChange={e=>isB?null:updSeg(p.id,seg.id,'larg',e.target.value)} placeholder="Larg. (m)" step="0.01" style={{...INPUT,height:'38px',fontSize:'13px',fontWeight:500,textAlign:'right'}}/>
+              <div style={{textAlign:'right',fontSize:'15px',fontWeight:600,color:accentColor}}>{f2((parseFloat(seg.comp)||0)*(parseFloat(seg.larg)||0))}</div>
               {(p.segmentos||[]).length>1&&!isB&&<button onClick={()=>delSeg(p.id,seg.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px'}}>✕</button>}
             </div>
           ))}
@@ -332,7 +332,7 @@ function Calculadora({ current, setCurrent, onBack }) {
             </div>
             <div>
               <div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',marginBottom:'4px'}}>Tipo</div>
-              <select value={current.tipo} onChange={e=>upd('tipo',e.target.value)} style={{...INPUT,cursor:'pointer',height:'34px'}}>
+              <select value={current.tipo} onChange={e=>upd('tipo',e.target.value)} style={{...INPUT,cursor:'pointer',height:'34px',background:'#1a1a1c'}}>
                 {TIPOS_ALL.map(t=><option key={t} value={t}>{t}</option>)}
               </select>
             </div>
@@ -414,7 +414,7 @@ function Calculadora({ current, setCurrent, onBack }) {
               if (!p.desc && TIPOS_PEDRA.includes(p.tipo)) return null
               return (
                 <div key={p.id} style={{marginBottom:'1rem'}}>
-                  <div style={{fontSize:'11px',fontWeight:600,color:'#C4A96A',letterSpacing:'0.08em',marginBottom:'6px'}}>{p.label}{p.desc?' — '+p.desc:''}{p.espessura?' '+p.espessura:''}{res.m2>0?` · ${res.m2.toFixed(3)} m²`:''}</div>
+                  <div style={{fontSize:'11px',fontWeight:600,color:'#C4A96A',letterSpacing:'0.08em',marginBottom:'6px'}}>{p.label}{p.desc?' — '+p.desc:''}{p.espessura?' '+p.espessura:''}</div>
                   {esp && <RefRow label="Tampo / m²" c1={esp.c1} pvp={esp.pvp} refAnigraco={esp.refAnigraco||null} calc={res.m2>0?`${res.m2.toFixed(3)} m² × ${f2(esp.pvp)} = ${f2(res.pvpTampo)} €`:null}/>}
                   {(p.acabamentos||[]).map(a=>{
                     const base = acabDisp.find(x=>x.nome===a.nome)
@@ -435,7 +435,7 @@ function Calculadora({ current, setCurrent, onBack }) {
               if (!p.desc) return null
               return (
                 <div key={p.id} style={{marginBottom:'1rem'}}>
-                  <div style={{fontSize:'11px',fontWeight:600,color:'#4a8fa8',letterSpacing:'0.08em',marginBottom:'6px'}}>B: {p.label}{p.desc?' — '+p.desc:''}{p.espessura?' '+p.espessura:''}{res.m2>0?` · ${res.m2.toFixed(3)} m²`:''}</div>
+                  <div style={{fontSize:'11px',fontWeight:600,color:'#4a8fa8',letterSpacing:'0.08em',marginBottom:'6px'}}>B: {p.label}{p.desc?' — '+p.desc:''}{p.espessura?' '+p.espessura:''}</div>
                   {esp && <RefRow label="Tampo / m²" c1={esp.c1} pvp={esp.pvp} refAnigraco={esp.refAnigraco||null} calc={res.m2>0?`${res.m2.toFixed(3)} m² × ${f2(esp.pvp)} = ${f2(res.pvpTampo)} €`:null} isB/>}
                 </div>
               )
@@ -481,26 +481,37 @@ function Calculadora({ current, setCurrent, onBack }) {
 function RefRow({ label, c1, pvp, unidade, refAnigraco, calc, isB }) {
   const accentColor = isB ? '#4a8fa8' : '#C4A96A'
   return (
-    <div style={{display:'flex',alignItems:'center',padding:'8px 12px',borderBottom:'0.5px solid rgba(255,255,255,0.04)',gap:'12px'}}>
-      <div style={{flex:1}}>
-        <div style={{fontSize:'12px',color:'rgba(255,255,255,0.7)'}}>{label}{unidade&&<span style={{fontSize:'9px',color:'rgba(255,255,255,0.3)',marginLeft:'6px'}}>/{unidade}</span>}</div>
-        {refAnigraco && <div style={{display:'flex',alignItems:'center',gap:'6px',marginTop:'3px'}}><span style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',textTransform:'uppercase',letterSpacing:'0.1em'}}>Anigraco</span><CopyVal val={refAnigraco} label="Ref Anigraco" small /></div>}
-        {calc && <div style={{fontSize:'9px',color:accentColor,marginTop:'2px'}}>{calc}</div>}
+    <div style={{display:'flex',alignItems:'center',padding:'9px 14px',borderBottom:'0.5px solid rgba(255,255,255,0.04)',gap:'12px'}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+          <span style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',fontWeight:500}}>{label}</span>
+          {unidade && <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.05)',padding:'1px 6px',borderRadius:'4px'}}>{unidade}</span>}
+          {refAnigraco && <div style={{display:'flex',alignItems:'center',gap:'5px'}}><span style={{fontSize:'9px',color:'rgba(255,255,255,0.2)',textTransform:'uppercase',letterSpacing:'0.08em'}}>Anigraco</span><CopyVal val={refAnigraco} label="Ref Anigraco" small /></div>}
+        </div>
+        {calc && <div style={{fontSize:'12px',color:accentColor,marginTop:'3px'}}>{calc.split(' × ')[0].split(' = ')[0]}</div>}
       </div>
-      <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
-        <div style={{textAlign:'right'}}><div style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',marginBottom:'2px'}}>C1</div><CopyVal val={c1fmt(c1)} label="C1" small /></div>
-        <div style={{textAlign:'right'}}><div style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',marginBottom:'2px'}}>PVP</div><CopyVal val={f2(pvp)} label="PVP" gold small /></div>
+      <div style={{display:'flex',alignItems:'flex-start',gap:'8px',flexShrink:0}}>
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',marginBottom:'3px',letterSpacing:'0.08em',textTransform:'uppercase'}}>C1</div>
+          <CopyVal val={c1fmt(c1)} label="C1" small />
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',marginBottom:'3px',letterSpacing:'0.08em',textTransform:'uppercase'}}>PVP</div>
+          <CopyVal val={f2(pvp)} label="PVP" gold small />
+          {calc && <div style={{fontSize:'10px',color:'rgba(255,255,255,0.28)',marginTop:'3px',whiteSpace:'nowrap'}}>{calc}</div>}
+        </div>
       </div>
     </div>
   )
 }
 
-function CopyVal({ val, label, gold, small }) {
+function CopyVal({ val, label, gold, small, large }) {
   const [copied, setCopied] = useState(false)
   const copy = (e) => { e.stopPropagation(); navigator.clipboard.writeText(val); setCopied(true); setTimeout(()=>setCopied(false),1500) }
+  const size = large ? '16px' : small ? '11px' : '13px'
   return (
-    <button onClick={copy} style={{background:copied?'rgba(77,207,170,0.1)':gold?'rgba(196,169,106,0.06)':'rgba(255,255,255,0.04)',border:copied?'0.5px solid rgba(77,207,170,0.3)':gold?'0.5px solid rgba(196,169,106,0.2)':'0.5px solid rgba(255,255,255,0.08)',borderRadius:'6px',padding:small?'2px 8px':'4px 12px',fontSize:small?'11px':'13px',fontWeight:gold?600:400,color:copied?'#4dcfaa':gold?'#C4A96A':'rgba(255,255,255,0.65)',cursor:'pointer',fontFamily:'monospace',transition:'all 0.2s',display:'flex',alignItems:'center',gap:'4px'}}>
-      {copied?'✓':val} <span style={{fontSize:'9px',opacity:0.5}}>{copied?'':' ⎘'}</span>
+    <button onClick={copy} style={{background:copied?'rgba(77,207,170,0.1)':gold?'rgba(196,169,106,0.08)':'rgba(255,255,255,0.05)',border:copied?'0.5px solid rgba(77,207,170,0.4)':gold?'0.5px solid rgba(196,169,106,0.25)':'0.5px solid rgba(255,255,255,0.1)',borderRadius:'8px',padding:large?'6px 12px':small?'2px 8px':'4px 12px',fontSize:size,fontWeight:large||gold?600:400,color:copied?'#4dcfaa':gold?'#C4A96A':'rgba(255,255,255,0.7)',cursor:'pointer',fontFamily:'monospace',transition:'all 0.2s',display:'flex',alignItems:'center',gap:'4px',width:'100%',justifyContent:'center',boxShadow:large&&!copied?gold?'0 0 10px rgba(196,169,106,0.1)':'0 0 10px rgba(255,255,255,0.03)':'none'}}>
+      {copied?'✓ copiado':val} {!copied&&<span style={{fontSize:'9px',opacity:0.4}}>⎘</span>}
     </button>
   )
 }
