@@ -4,6 +4,7 @@ import Biblioteca from './pages/Biblioteca'
 import Categoria from './pages/Categoria'
 import Orcamento from './pages/Orcamento'
 import Tampos from './pages/Tampos'
+import Kits from './pages/Kits'
 
 const navSections = [
   {
@@ -46,6 +47,11 @@ function NavItemReset({ item }) {
     }
     if (item.to === '/biblioteca') {
       localStorage.removeItem('orc_contexto')
+    }
+    if (item.to === '/kits') {
+      const contexto = localStorage.getItem('kit_contexto')
+      if (!contexto) localStorage.removeItem('kit_ativo')
+      localStorage.removeItem('kit_contexto')
     }
     navigate(item.to)
   }
@@ -129,7 +135,7 @@ function App() {
             <Route path="/tampos" element={<Tampos />} />
             <Route path="/mao-de-obra" element={<Placeholder label="Mão de obra" />} />
             <Route path="/bundles" element={<Placeholder label="Bundles" />} />
-            <Route path="/kits" element={<Placeholder label="Kits" />} />
+            <Route path="/kits" element={<Kits />} />
             <Route path="/projectos" element={<Placeholder label="Projectos" />} />
             <Route path="/orcamento" element={<Orcamento />} />
             <Route path="/proposta" element={<Placeholder label="Proposta" />} />

@@ -73,8 +73,12 @@ export default function Biblioteca() {
   const [orcContexto, setOrcContexto] = useState(() => {
     try { return JSON.parse(localStorage.getItem('orc_contexto')) } catch { return null }
   })
+  const [kitContexto, setKitContexto] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kit_contexto')) } catch { return null }
+  })
   const [adicionados, setAdicionados] = useState(0)
   const [refsNaSecao, setRefsNaSecao] = useState(new Set())
+  const [refsNoKit, setRefsNoKit] = useState(new Set())
   const [cats, setCats]           = useState([])
   const [arts, setArts]           = useState([])
   const [activeCat, setActiveCat] = useState(null)
@@ -88,6 +92,17 @@ export default function Biblioteca() {
   const [catModal, setCatModal]   = useState(false)
   const [editId, setEditId]       = useState(null)
   const [form, setForm] = useState({ ref:'',desc:'',cat:'',sub:'',price:'',supplier:'',link:'',notes:'',star:false })
+
+  // Carregar refs já no kit ativo
+  useEffect(() => {
+    if (!kitContexto) return
+    const u = onSnapshot(doc(db,'kits',kitContexto.kitId), snap => {
+      if (!snap.exists()) return
+      const refs = new Set((snap.data().itens||[]).map(i=>i.ref).filter(Boolean))
+      setRefsNoKit(refs)
+    })
+    return u
+  }, [kitContexto?.kitId])
 
   // Carregar refs já existentes na secção ativa
   useEffect(() => {
@@ -164,6 +179,28 @@ export default function Biblioteca() {
 
   const countFor = (name) => arts.filter(a=>a.cat===name).length
 
+  const [adicionadosKit, setAdicionadosKit] = useState(0)
+
+  const addToKit = async (art) => {
+    if (!kitContexto) return
+    const artigo = { ref: art.ref, desc: art.desc, preco: art.price||0, tipo: 'artigo' }
+    try {
+      const kitRef = doc(db, 'kits', kitContexto.kitId)
+      const snap = await getDoc(kitRef)
+      if (!snap.exists()) return
+      const itens = [...(snap.data().itens||[]), artigo]
+      await updateDoc(kitRef, { itens })
+      setAdicionadosKit(n => n+1)
+    } catch(e) { console.error(e) }
+  }
+
+  const voltarKit = () => {
+    localStorage.removeItem('kit_contexto')
+    setKitContexto(null)
+    setAdicionadosKit(0)
+    navigate('/kits')
+  }
+
   const addToOrc = async (art) => {
     if (!orcContexto) return
     const artigo = { ref: art.ref, desc: art.desc, preco: art.price||0, supplier: art.supplier||'', cat: art.cat||'', sub: art.sub||'', link: art.link||'' }
@@ -218,6 +255,20 @@ export default function Biblioteca() {
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
 
       {/* BANNER ORÇAMENTO ATIVO */}
+      {kitContexto && (
+        <div style={{background:'rgba(80,140,230,0.08)',borderBottom:'0.5px solid rgba(80,140,230,0.2)',padding:'0.5rem 1.25rem',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+          <span style={{fontSize:'12px',color:'#7aaff0',flex:1}}>
+            A adicionar ao kit: <strong>{kitContexto.kitNome}</strong>
+            {adicionadosKit>0 && <span style={{marginLeft:'8px',fontSize:'11px',background:'rgba(80,140,230,0.2)',padding:'1px 8px',borderRadius:'20px'}}>{adicionadosKit} adicionado{adicionadosKit>1?'s':''}</span>}
+          </span>
+          <button onClick={voltarKit} style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(80,140,230,0.4)',background:'rgba(80,140,230,0.15)',fontSize:'11px',color:'#7aaff0',cursor:'pointer',fontWeight:500}}>
+            ← Voltar ao kit
+          </button>
+          <button onClick={()=>{localStorage.removeItem('kit_contexto');setKitContexto(null);setAdicionadosKit(0)}} style={{height:'28px',padding:'0 0.75rem',borderRadius:'6px',border:'0.5px solid rgba(255,255,255,0.08)',background:'transparent',fontSize:'11px',color:'rgba(255,255,255,0.3)',cursor:'pointer'}}>
+            Cancelar
+          </button>
+        </div>
+      )}
       {orcContexto && (
         <div style={{background:'rgba(196,169,106,0.08)',borderBottom:'0.5px solid rgba(196,169,106,0.2)',padding:'0.5rem 1.25rem',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
           <span style={{fontSize:'12px',color:'#C4A96A',flex:1}}>
@@ -328,7 +379,7 @@ export default function Biblioteca() {
             ) : (
               <div style={{display:'flex',flexDirection:'column',gap:'5px'}}>
                 {filtered.map(art=>(
-                  <CardArtigo key={art.id} art={art} onEdit={openEdit} onDel={delArt} onStar={toggleStar} orcContexto={orcContexto} onAddOrc={addToOrc} search={search} jaAdicionado={refsNaSecao.has(art.ref)} />
+                  <CardArtigo key={art.id} art={art} onEdit={openEdit} onDel={delArt} onStar={toggleStar} orcContexto={orcContexto} onAddOrc={addToOrc} kitContexto={kitContexto} onAddKit={addToKit} search={search} jaAdicionado={refsNaSecao.has(art.ref)} jaAdicionadoKit={refsNoKit.has(art.ref)} />
                 ))}
               </div>
             )}
@@ -406,7 +457,7 @@ function Highlight({ text, query }) {
   )
 }
 
-function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, search, jaAdicionado }) {
+function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, kitContexto, onAddKit, search, jaAdicionado, jaAdicionadoKit }) {
   const [open, setOpen] = useState(false)
   const isStar = art.star
   const label = [art.cat, art.sub].filter(Boolean).join(' · ')
@@ -451,6 +502,11 @@ function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, search,
           {orcContexto && (
             <button onClick={e=>{e.stopPropagation();onAddOrc(art)}} style={{height:'26px',padding:'0 0.75rem',borderRadius:'6px',border:jaAdicionado?'0.5px solid rgba(77,207,170,0.4)':'0.5px solid rgba(196,169,106,0.35)',background:jaAdicionado?'rgba(77,207,170,0.1)':'rgba(196,169,106,0.1)',fontSize:'11px',color:jaAdicionado?'#4dcfaa':'#C4A96A',cursor:'pointer',whiteSpace:'nowrap'}}>
               {jaAdicionado ? '✓ Adicionado' : '+ Orçamento'}
+            </button>
+          )}
+          {kitContexto && (
+            <button onClick={e=>{e.stopPropagation();onAddKit(art)}} style={{height:'26px',padding:'0 0.75rem',borderRadius:'6px',border:jaAdicionadoKit?'0.5px solid rgba(77,207,170,0.4)':'0.5px solid rgba(80,140,230,0.35)',background:jaAdicionadoKit?'rgba(77,207,170,0.1)':'rgba(80,140,230,0.1)',fontSize:'11px',color:jaAdicionadoKit?'#4dcfaa':'#7aaff0',cursor:'pointer',whiteSpace:'nowrap'}}>
+              {jaAdicionadoKit ? '✓ No kit' : '+ Kit'}
             </button>
           )}
           <button onClick={e=>{e.stopPropagation();onStar(art)}} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:'14px',color:isStar?'#f0c040':'rgba(255,255,255,0.2)',padding:'4px'}}>{isStar?'★':'☆'}</button>
