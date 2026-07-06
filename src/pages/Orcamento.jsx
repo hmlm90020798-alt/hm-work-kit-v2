@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
 import { collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import CopyRef from '../components/CopyRef'
+import { corPorNome } from '../utils/corPorNome'
+import { corPorCategoria } from '../utils/corPorCategoria'
 
 const ESTADOS = {
   curso:    { label: 'Em curso',  cor: 'rgba(196,169,106,0.8)' },
@@ -167,6 +169,10 @@ export default function Orcamento() {
 function OrcamentoDetalhe({ orc, onVoltar }) {
   const navigate = useNavigate()
   const [novaSecao, setNovaSecao] = useState('')
+  const [catCollapsed, setCatCollapsed] = useState({})
+  const [dragItem, setDragItem] = useState(null)   // { secaoId, idx }
+  const [dragSecao, setDragSecao] = useState(null)  // idx da secção
+  const [kitsModal, setKitsModal] = useState(null) // secao alvo
 
   const secoes = orc.secoes || []
   const total = calcTotal(secoes)
@@ -194,6 +200,24 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
     await saveSecoes(novas)
   }
 
+  const marcarCopiado = async (secaoId, idx) => {
+    const novas = secoes.map(s => {
+      if (s.id !== secaoId) return s
+      const itens = [...s.itens]
+      itens[idx] = { ...itens[idx], copiado: true }
+      return { ...s, itens }
+    })
+    await saveSecoes(novas)
+  }
+
+  const resetCopiados = async (secaoId) => {
+    const novas = secoes.map(s => {
+      if (s.id !== secaoId) return s
+      return { ...s, itens: s.itens.map(i => ({ ...i, copiado: false })) }
+    })
+    await saveSecoes(novas)
+  }
+
   const updateQty = async (secaoId, idx, qty) => {
     if (qty<1) return
     const novas = secoes.map(s => {
@@ -203,6 +227,43 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
       return { ...s, itens }
     })
     await saveSecoes(novas)
+  }
+
+  const aplicarKit = async (secao, kit) => {
+    const itensKit = (kit.itens||[]).map(i=>({ ref:i.ref||'', desc:i.desc, preco:i.preco||0, link:i.link||'', qty:1, origemKit:kit.nome }))
+    const novas = secoes.map(s => s.id===secao.id ? {...s, itens:[...(s.itens||[]), ...itensKit]} : s)
+    await saveSecoes(novas)
+    setKitsModal(null)
+  }
+
+  const reorderItem = async (secaoId, fromIdx, toIdx) => {
+    if (fromIdx === toIdx) return
+    const novas = secoes.map(s => {
+      if (s.id !== secaoId) return s
+      const itens = [...s.itens]
+      const [moved] = itens.splice(fromIdx, 1)
+      itens.splice(toIdx, 0, moved)
+      return { ...s, itens }
+    })
+    await saveSecoes(novas)
+  }
+
+  const reorderSecao = async (fromIdx, toIdx) => {
+    if (fromIdx === toIdx) return
+    const novas = [...secoes]
+    const [moved] = novas.splice(fromIdx, 1)
+    novas.splice(toIdx, 0, moved)
+    await saveSecoes(novas)
+  }
+
+  const irTampos = (secao) => {
+    localStorage.setItem('orc_contexto', JSON.stringify({ orcId: orc.id, secaoId: secao.id, secaoNome: secao.nome }))
+    navigate('/tampos')
+  }
+
+  const irMaoDeObra = (secao) => {
+    localStorage.setItem('orc_contexto', JSON.stringify({ orcId: orc.id, secaoId: secao.id, secaoNome: secao.nome }))
+    navigate('/mao-de-obra')
   }
 
   const irBiblioteca = (secao) => {
@@ -278,10 +339,24 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
           </div>
         ) : (
           <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'1rem'}}>
-            {secoes.map(secao => (
-              <div key={secao.id} style={{background:'rgba(255,255,255,0.025)',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'10px',overflow:'hidden'}}>
-                <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0.6rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.05)'}}>
+            {secoes.map((secao,secaoIdx) => (
+              <div key={secao.id}
+                draggable
+                onDragStart={()=>setDragSecao(secaoIdx)}
+                onDragOver={e=>e.preventDefault()}
+                onDrop={()=>{if(dragSecao!==null){reorderSecao(dragSecao,secaoIdx);setDragSecao(null)}}}
+                onDragEnd={()=>setDragSecao(null)}
+                style={{background:'rgba(255,255,255,0.025)',border:'0.5px solid rgba(255,255,255,0.07)',borderLeft:`2px solid ${corPorNome(secao.nome).color}`,borderRadius:'10px',overflow:'hidden',opacity:dragSecao===secaoIdx?0.4:1,transition:'opacity 0.15s'}}
+              >
+                <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0.6rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.05)',cursor:'grab'}}>
+                  <span style={{color:'rgba(255,255,255,0.15)',fontSize:'12px',cursor:'grab'}}>⠿</span>
+                  <span style={{width:'8px',height:'8px',borderRadius:'50%',background:corPorNome(secao.nome).color,boxShadow:`0 0 6px ${corPorNome(secao.nome).glow}`,flexShrink:0}}/>
                   <span style={{fontSize:'12px',fontWeight:500,color:'rgba(255,255,255,0.6)',flex:1}}>{secao.nome}</span>
+                  {(()=>{const total=(secao.itens||[]).length,cop=(secao.itens||[]).filter(i=>i.copiado).length
+                    return total>0 && <span style={{fontSize:'10px',color:cop===total?'#4dcfaa':'rgba(255,255,255,0.3)',background:cop===total?'rgba(77,207,170,0.1)':'rgba(255,255,255,0.04)',padding:'2px 8px',borderRadius:'20px'}}>{cop}/{total} copiados</span>})()}
+                  {(secao.itens||[]).some(i=>i.copiado) && (
+                    <button onClick={()=>resetCopiados(secao.id)} title="Reiniciar marcações de cópia" style={{background:'transparent',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:'rgba(255,255,255,0.35)',fontSize:'10px',padding:'3px 8px',cursor:'pointer'}}>↺ reset</button>
+                  )}
                   <span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>{(secao.itens||[]).length} itens</span>
                   <span style={{fontSize:'12px',fontWeight:500,color:'#C4A96A',marginLeft:'8px'}}>
                     {(secao.itens||[]).reduce((t,i)=>t+(i.preco||0)*(i.qty||1),0).toFixed(2)} €
@@ -289,9 +364,18 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
                   <button onClick={()=>delSecao(secao.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px',padding:'2px 6px'}}>✕</button>
                 </div>
 
-                <div style={{padding:'8px 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.04)'}}>
+                <div style={{padding:'8px 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.04)',display:'flex',gap:'8px'}}>
                   <button onClick={()=>irBiblioteca(secao)} style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.3)',background:'rgba(196,169,106,0.06)',fontSize:'11.5px',color:'rgba(196,169,106,0.8)',cursor:'pointer'}}>
                     + Artigo da Biblioteca
+                  </button>
+                  <button onClick={()=>setKitsModal(secao)} style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(80,140,230,0.3)',background:'rgba(80,140,230,0.06)',fontSize:'11.5px',color:'rgba(80,140,230,0.8)',cursor:'pointer'}}>
+                    + Kit
+                  </button>
+                  <button onClick={()=>irMaoDeObra(secao)} style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(150,100,230,0.3)',background:'rgba(150,100,230,0.06)',fontSize:'11.5px',color:'rgba(150,100,230,0.8)',cursor:'pointer'}}>
+                    + Mão de obra
+                  </button>
+                  <button onClick={()=>irTampos(secao)} style={{height:'28px',padding:'0 0.875rem',borderRadius:'6px',border:'0.5px solid rgba(40,190,140,0.3)',background:'rgba(40,190,140,0.06)',fontSize:'11.5px',color:'rgba(40,190,140,0.8)',cursor:'pointer'}}>
+                    + Tampo
                   </button>
                 </div>
 
@@ -299,30 +383,102 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
                   <div style={{padding:'0.75rem 1rem',fontSize:'12px',color:'rgba(255,255,255,0.2)'}}>
                     Nenhum artigo ainda.
                   </div>
-                ) : (
-                  <>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 90px 80px 32px',padding:'0.4rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.04)'}}>
-                      {['Artigo','Qty','Total',''].map(h=>(
-                        <span key={h} style={{fontSize:'10px',color:'rgba(255,255,255,0.2)',letterSpacing:'0.06em',textTransform:'uppercase',textAlign:h==='Total'?'right':h===''?'center':'left'}}>{h}</span>
-                      ))}
-                    </div>
-                    {(secao.itens||[]).map((item,idx)=>{
-                      const temVariantes = item.variantes && item.variantes.length > 1
-                      const ativa = temVariantes ? (item.variantes.find(v=>v.ativa)||item.variantes[0]) : item
-                      return (
-                        <div key={idx}>
+                ) : (() => {
+                  // Agrupar itens por categoria mantendo o índice original (necessário para as ações)
+                  const comIdx = (secao.itens||[]).map((item,idx)=>({item,idx}))
+                  const grupos = {}
+                  comIdx.forEach(({item,idx}) => {
+                    const groupKey = item.origemKit ? ('kit:'+item.origemKit) : (item.cat || (item.variantes?.[0]?.cat) || 'Outros')
+                    if (!grupos[groupKey]) grupos[groupKey] = []
+                    grupos[groupKey].push({item,idx})
+                  })
+                  const nomesCats = Object.keys(grupos).sort((a,b)=>{
+                    const aKit=a.startsWith('kit:'), bKit=b.startsWith('kit:')
+                    if (aKit && !bKit) return -1
+                    if (!aKit && bKit) return 1
+                    if (a==='Mão de Obra') return 1
+                    if (b==='Mão de Obra') return -1
+                    return a.localeCompare(b)
+                  })
+
+                  return nomesCats.map(catNome => {
+                    const grupo = grupos[catNome]
+                    const isKitGroup = catNome.startsWith('kit:')
+                    const nomeExibido = isKitGroup ? catNome.slice(4) : catNome
+                    const corCat = isKitGroup ? corPorNome(nomeExibido) : corPorCategoria(catNome)
+                    const key = secao.id+':'+catNome
+                    const isOpen = !catCollapsed[key]
+                    const subtotal = grupo.reduce((t,{item})=>{
+                      const ativa = item.variantes ? (item.variantes.find(v=>v.ativa)||item.variantes[0]) : item
+                      return t + (ativa.preco||item.preco||0)*(item.qty||1)
+                    },0)
+                    return (
+                      <div key={catNome}>
+                        <button
+                          onClick={()=>setCatCollapsed(c=>({...c,[key]:!c[key]}))}
+                          style={{width:'100%',display:'flex',alignItems:'center',gap:'8px',padding:'0.45rem 1rem',background:corCat.bg,border:'none',borderBottom:'0.5px solid rgba(255,255,255,0.04)',cursor:'pointer',textAlign:'left'}}
+                        >
+                          <span style={{width:'6px',height:'6px',borderRadius:'50%',background:corCat.color,flexShrink:0}}/>
+                          <span style={{fontSize:'11px',fontWeight:600,color:corCat.color,letterSpacing:'0.04em'}}>{isKitGroup ? `Kit: ${nomeExibido}` : catNome}</span>
+                          <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)'}}>({grupo.length})</span>
+                          <span style={{flex:1}}/>
+                          <span style={{fontSize:'12px',fontWeight:500,color:corCat.color}}>{subtotal.toFixed(2)} €</span>
+                          <span style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',transform:isOpen?'rotate(0deg)':'rotate(-90deg)',transition:'transform 0.15s',display:'inline-block'}}>▾</span>
+                        </button>
+                        {isOpen && (
+                          <>
+                            <div style={{display:'grid',gridTemplateColumns:'16px 1fr 90px 80px 32px',padding:'0.3rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.03)'}}>
+                              {['','Artigo','Qty','Total',''].map((h,hi)=>(
+                                <span key={hi} style={{fontSize:'9px',color:'rgba(255,255,255,0.18)',letterSpacing:'0.06em',textTransform:'uppercase',textAlign:h==='Total'?'right':h===''?'center':'left'}}>{h}</span>
+                              ))}
+                            </div>
+                            {grupo.map(({item,idx})=>{
+                              const temVariantes = item.variantes && item.variantes.length > 1
+                              const ativa = temVariantes ? (item.variantes.find(v=>v.ativa)||item.variantes[0]) : item
+                              return (
+                                <div key={idx}
+                                  draggable
+                                  onDragStart={()=>setDragItem({secaoId:secao.id, idx})}
+                                  onDragOver={e=>e.preventDefault()}
+                                  onDrop={()=>{if(dragItem&&dragItem.secaoId===secao.id){reorderItem(secao.id,dragItem.idx,idx);setDragItem(null)}}}
+                                  onDragEnd={()=>setDragItem(null)}
+                                  style={{opacity:dragItem?.secaoId===secao.id&&dragItem.idx===idx?0.35:1,transition:'opacity 0.15s'}}
+                                >
                           {/* Linha principal */}
-                          <div style={{display:'grid',gridTemplateColumns:'1fr 90px 80px 100px 32px',alignItems:'center',padding:'0.5rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.03)'}}>
+                          <div
+                            onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.055)'}
+                            onMouseLeave={e=>e.currentTarget.style.background=item.copiado ? 'rgba(255,255,255,0.015)' : `linear-gradient(90deg, ${corCat.glow} 0%, transparent 40%)`}
+                            style={{
+                            display:'grid',gridTemplateColumns:'16px 1fr 90px 80px 100px 32px',alignItems:'center',
+                            padding:'0.5rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.03)',
+                            borderLeft:`2px solid ${corCat.color}`,
+                            background: item.copiado ? 'rgba(255,255,255,0.015)' : `linear-gradient(90deg, ${corCat.glow} 0%, transparent 40%)`,
+                            opacity: item.copiado ? 0.55 : 1,
+                            transition:'background 0.1s, opacity 0.2s',
+                            cursor:'grab',
+                          }}>
+                            <span style={{color:'rgba(255,255,255,0.12)',fontSize:'11px'}}>⠿</span>
                             <div>
                               <div style={{fontSize:'12px',color:'rgba(255,255,255,0.75)',marginBottom:'2px'}}>{ativa.desc||item.desc}</div>
-                              <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                                <CopyRef refCode={ativa.ref||item.ref} />
+                              <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+                                <CopyRef refCode={ativa.ref||item.ref} marcado={item.copiado} onCopy={()=>marcarCopiado(secao.id,idx)} />
+                                {(ativa.link||item.link) && (
+                                  <a href={ativa.link||item.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',textDecoration:'none',padding:'2px 6px',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'5px'}}>↗</a>
+                                )}
+                                {item.cat && <span style={{fontSize:'9px',padding:'1px 6px',borderRadius:'20px',background:corCat.bg,color:corCat.color}}>{item.cat}</span>}
                                 {temVariantes && <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'20px',background:'rgba(196,169,106,0.1)',color:'#C4A96A'}}>A/B</span>}
                               </div>
                             </div>
                             <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
                               <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)-1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-                              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.6)',minWidth:'20px',textAlign:'center'}}>{item.qty||1}</span>
+                              <input
+                                type="number"
+                                value={item.qty||1}
+                                min={1}
+                                onClick={e=>e.stopPropagation()}
+                                onChange={e=>updateQty(secao.id,idx,parseInt(e.target.value)||1)}
+                                style={{width:'34px',height:'22px',background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'4px',color:'rgba(255,255,255,0.75)',fontSize:'12px',textAlign:'center',outline:'none'}}
+                              />
                               <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)+1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
                             </div>
                             <span style={{fontSize:'12px',fontWeight:500,color:'#C4A96A',textAlign:'right'}}>{((ativa.preco||item.preco||0)*(item.qty||1)).toFixed(2)} €</span>
@@ -336,7 +492,10 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
                                 <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'4px',background:v.ativa?'rgba(77,207,170,0.15)':'rgba(255,255,255,0.05)',color:v.ativa?'#4dcfaa':'rgba(255,255,255,0.3)',fontWeight:600}}>{vi===0?'A':'B'}</span>
                                 <div>
                                   <div style={{fontSize:'11.5px',color:v.ativa?'rgba(255,255,255,0.75)':'rgba(255,255,255,0.35)'}}>{v.desc}</div>
-                                  <CopyRef refCode={v.ref} style={{fontSize:'10px'}} />
+                                  <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                                    <CopyRef refCode={v.ref} style={{fontSize:'10px'}} />
+                                    {v.link && <a href={v.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',textDecoration:'none',padding:'2px 5px',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'4px'}}>↗</a>}
+                                  </div>
                                 </div>
                               </div>
                               <span style={{fontSize:'12px',fontWeight:500,color:v.ativa?'#4dcfaa':'rgba(255,255,255,0.3)',textAlign:'right'}}>{(v.preco||0).toFixed(2)} €</span>
@@ -346,8 +505,12 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
                         </div>
                       )
                     })}
-                  </>
-                )}
+                          </>
+                        )}
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             ))}
           </div>
@@ -356,6 +519,39 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
         <div style={{display:'flex',gap:'8px',marginTop:'0.5rem'}}>
           <input value={novaSecao} onChange={e=>setNovaSecao(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addSecao()} placeholder="Nova secção (ex: Cozinha)..." style={{...INPUT,flex:1}}/>
           <button onClick={addSecao} style={BTN_GOLD()}>+ Secção</button>
+        </div>
+      </div>
+
+      {kitsModal && <EscolherKitModal secao={kitsModal} onSelect={(kit)=>aplicarKit(kitsModal,kit)} onClose={()=>setKitsModal(null)} />}
+    </div>
+  )
+}
+
+function EscolherKitModal({ secao, onSelect, onClose }) {
+  const [kits, setKits] = useState([])
+  useEffect(() => {
+    const u = onSnapshot(collection(db,'kits'), snap => setKits(snap.docs.map(d=>({id:d.id,...d.data()}))))
+    return u
+  }, [])
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(4px)'}}>
+      <div style={{background:'#161618',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'16px',padding:'1.5rem',width:'420px',maxWidth:'90vw',maxHeight:'70vh',display:'flex',flexDirection:'column',gap:'10px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <span style={{fontSize:'14px',fontWeight:500,color:'rgba(255,255,255,0.85)'}}>Aplicar kit a "{secao.nome}"</span>
+          <button onClick={onClose} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'18px',cursor:'pointer'}}>✕</button>
+        </div>
+        <div style={{overflowY:'auto',display:'flex',flexDirection:'column',gap:'6px'}}>
+          {kits.length===0 && <div style={{color:'rgba(255,255,255,0.25)',fontSize:'12px',textAlign:'center',padding:'2rem 0'}}>Nenhum kit criado ainda.</div>}
+          {kits.map(kit=>(
+            <div key={kit.id} onClick={()=>onSelect(kit)}
+              style={{padding:'0.75rem 1rem',borderRadius:'8px',border:'0.5px solid rgba(255,255,255,0.06)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',transition:'all 0.15s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(80,140,230,0.06)';e.currentTarget.style.borderColor='rgba(80,140,230,0.25)'}}
+              onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor='rgba(255,255,255,0.06)'}}
+            >
+              <span style={{fontSize:'13px',color:'rgba(255,255,255,0.8)'}}>{kit.nome}</span>
+              <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{(kit.itens||[]).length} itens</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

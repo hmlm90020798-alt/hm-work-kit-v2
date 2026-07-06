@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
-import { collection, doc, onSnapshot, setDoc, deleteDoc, addDoc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { ANIGRACO, TRANSPORTE, TIPOS_PEDRA, TIPOS_ALL } from '../data/anigracoData'
 import { calcPeca, novoProjeto, totProj, uuid, f2, c1fmt } from '../hooks/useTampos'
 
@@ -43,8 +44,14 @@ function totGeral(pecas, transporte, desconto, descontoTipo) {
 }
 
 export default function Tampos() {
+  const navigate = useNavigate()
+  const [orcContexto, setOrcContexto] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('orc_contexto')) } catch { return null }
+  })
+  const [adicionados, setAdicionados] = useState(0)
   const [calculos, setCalculos] = useState([])
   const [current, setCurrent]   = useState(null)
+  const [calculosOpen, setCalculosOpen] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState('TODOS')
   const [matSearch, setMatSearch]   = useState('')
   const [matSort, setMatSort]       = useState('pvp_asc')
@@ -71,6 +78,42 @@ export default function Tampos() {
       return matSort==='pvp_desc' ? pvpB-pvpA : pvpA-pvpB
     })
 
+  const voltarOrcamento = () => {
+    localStorage.removeItem('orc_contexto')
+    setOrcContexto(null)
+    setAdicionados(0)
+    navigate('/orcamento')
+  }
+
+  const addCalculoAoOrc = async (c, e) => {
+    e.stopPropagation()
+    if (!orcContexto) return
+    const itens = []
+    ;(c.pecas||[]).forEach(p => {
+      const r = calcPeca(p)
+      if (r.pvpTampo>0) itens.push({ ref:'207849', desc:`${p.label||'Tampo'}${p.desc?' — '+p.desc:''}${p.espessura?' '+p.espessura:''}`.trim(), preco:r.pvpTampo, qty:1, cat:'Tampos (Anigraco)' })
+      ;(p.acabamentos||[]).forEach(a=>{
+        const qty = parseFloat(a.qty)||0
+        if (qty>0 && a.pvp) itens.push({ ref:'207849', desc:`${a.nome} (${qty} ${a.unidade||'un'})`, preco:a.pvp*qty, qty:1, cat:'Tampos (Anigraco)' })
+      })
+    })
+    if (c.transporte) itens.push({ ref:'', desc:c.transporte.label, preco:c.transporte.pvp, qty:1, cat:'Tampos (Anigraco)' })
+    const subtotalBruto = itens.reduce((s,i)=>s+i.preco,0)
+    if (parseFloat(c.desconto)>0) {
+      const valorDesconto = c.descontoTipo==='%' ? subtotalBruto*(parseFloat(c.desconto)/100) : parseFloat(c.desconto)
+      itens.push({ ref:'', desc:'Desconto', preco:-valorDesconto, qty:1, cat:'Tampos (Anigraco)' })
+    }
+    if (itens.length===0) return
+    try {
+      const orcRef = doc(db,'orcamentos',orcContexto.orcId)
+      const snap = await getDoc(orcRef)
+      if (!snap.exists()) return
+      const secoes = (snap.data().secoes||[]).map(s => s.id===orcContexto.secaoId ? {...s, itens:[...(s.itens||[]), ...itens]} : s)
+      await updateDoc(orcRef, { secoes, updatedAt: serverTimestamp() })
+      setAdicionados(n=>n+1)
+    } catch(err) { console.error(err) }
+  }
+
   const guardarEVoltar = async (dados) => {
     const c = dados || current
     if (c.nome?.trim() || (c.pecas||[]).some(p=>p.desc)) {
@@ -89,6 +132,16 @@ export default function Tampos() {
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
+      {orcContexto && (
+        <div style={{background:'rgba(196,169,106,0.08)',borderBottom:'0.5px solid rgba(196,169,106,0.2)',padding:'0.5rem 1.25rem',display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+          <span style={{fontSize:'12px',color:'#C4A96A',flex:1}}>
+            A adicionar para: <strong>{orcContexto.secaoNome}</strong>
+            {adicionados>0 && <span style={{marginLeft:'8px',fontSize:'11px',background:'rgba(196,169,106,0.2)',padding:'1px 8px',borderRadius:'20px'}}>{adicionados} adicionado{adicionados>1?'s':''}</span>}
+          </span>
+          <button onClick={voltarOrcamento} style={BTN_GOLD({height:'28px'})}>← Voltar ao orçamento</button>
+          <button onClick={()=>{localStorage.removeItem('orc_contexto');setOrcContexto(null);setAdicionados(0)}} style={{...BTN(),height:'28px'}}>Cancelar</button>
+        </div>
+      )}
       <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0 1.25rem',height:'52px',borderBottom:'0.5px solid rgba(255,255,255,0.06)',flexShrink:0,background:'rgba(13,13,15,0.95)'}}>
         <div style={{flex:1,fontSize:'14px',fontWeight:500,color:'rgba(255,255,255,0.7)'}}>Tampos</div>
         <AnigracoRef />
@@ -97,28 +150,41 @@ export default function Tampos() {
       </div>
 
       <div style={{flex:1,overflowY:'auto',padding:'1.25rem'}}>
-        {calculos.length>0 && <>
-          <div style={{fontSize:'10px',letterSpacing:'0.07em',textTransform:'uppercase',color:'rgba(255,255,255,0.25)',marginBottom:'0.75rem'}}>Cálculos guardados · {calculos.length}</div>
-          <div style={{display:'flex',flexDirection:'column',gap:'6px',marginBottom:'1.5rem'}}>
-            {calculos.map(c => {
-              const res = totProj(c)
-              return (
-                <div key={c.id} onClick={()=>setCurrent({...c})}
-                  style={{background:'rgba(255,255,255,0.03)',backdropFilter:'blur(12px)',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'10px',padding:'0.875rem 1rem',cursor:'pointer',display:'flex',alignItems:'center',gap:'1rem',transition:'all 0.15s'}}
-                  onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.06)';e.currentTarget.style.borderColor='rgba(196,169,106,0.2)'}}
-                  onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.03)';e.currentTarget.style.borderColor='rgba(255,255,255,0.07)'}}
-                >
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:'13px',fontWeight:500,color:'rgba(255,255,255,0.8)',marginBottom:'2px'}}>{c.nome||'Sem nome'}</div>
-                    <div style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{c.tipo}{c.contacto?' · '+c.contacto:''}</div>
-                  </div>
-                  <span style={{fontSize:'15px',fontWeight:500,color:'#C4A96A'}}>{f2(res.pvp)} €</span>
-                  <button onClick={e=>{e.stopPropagation();if(confirm('Eliminar?'))deleteDoc(doc(db,'tampos',c.id))}} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'14px',padding:'4px'}}>✕</button>
-                </div>
-              )
-            })}
+        {calculos.length>0 && (
+          <div style={{marginBottom:'1.5rem',background:'rgba(255,255,255,0.025)',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'10px',overflow:'hidden'}}>
+            <div
+              onClick={()=>setCalculosOpen(o=>!o)}
+              style={{display:'flex',alignItems:'center',gap:'10px',padding:'0.75rem 1rem',cursor:'pointer',borderBottom:calculosOpen?'0.5px solid rgba(255,255,255,0.06)':'none'}}
+            >
+              <span style={{fontSize:'10px',letterSpacing:'0.07em',textTransform:'uppercase',color:'rgba(255,255,255,0.4)',flex:1}}>Cálculos guardados · {calculos.length}</span>
+              <span style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',transition:'transform 0.2s',display:'inline-block',transform:calculosOpen?'rotate(180deg)':'rotate(0deg)'}}>▾</span>
+            </div>
+            {calculosOpen && (
+              <div style={{display:'flex',flexDirection:'column'}}>
+                {calculos.map(c => {
+                  const res = totProj(c)
+                  return (
+                    <div key={c.id} onClick={()=>setCurrent({...c})}
+                      style={{display:'flex',alignItems:'center',gap:'1rem',padding:'0.75rem 1rem',cursor:'pointer',borderBottom:'0.5px solid rgba(255,255,255,0.04)',transition:'background 0.15s'}}
+                      onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.04)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                    >
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'13px',fontWeight:500,color:'rgba(255,255,255,0.8)',marginBottom:'2px'}}>{c.nome||'Sem nome'}</div>
+                        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{c.tipo}{c.contacto?' · '+c.contacto:''}</div>
+                      </div>
+                      <span style={{fontSize:'14px',fontWeight:500,color:'#C4A96A'}}>{f2(res.pvp)} €</span>
+                      {orcContexto && (
+                        <button onClick={e=>addCalculoAoOrc(c,e)} style={{height:'28px',padding:'0 0.75rem',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.35)',background:'rgba(196,169,106,0.1)',fontSize:'11px',color:'#C4A96A',cursor:'pointer',whiteSpace:'nowrap'}}>+ Orçamento</button>
+                      )}
+                      <button onClick={e=>{e.stopPropagation();if(confirm('Eliminar?'))deleteDoc(doc(db,'tampos',c.id))}} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'14px',padding:'4px'}}>✕</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
-        </>}
+        )}
 
         <div style={{fontSize:'10px',letterSpacing:'0.07em',textTransform:'uppercase',color:'rgba(255,255,255,0.25)',marginBottom:'0.75rem'}}>Catálogo Anigraco</div>
 
@@ -175,6 +241,7 @@ export default function Tampos() {
 
 function Calculadora({ current, setCurrent, onBack }) {
   const [tab, setTab]           = useState('pecas')
+  const [dragPecaIdx, setDragPecaIdx] = useState(null)
   const [matModal, setMatModal] = useState(null)
   const [formulaOpen, setFormulaOpen] = useState(false)
   const [margem, setMargem]     = useState(25)
@@ -214,7 +281,15 @@ function Calculadora({ current, setCurrent, onBack }) {
     }).filter(Boolean)
   }
 
-  const renderPeca = (p, isB) => {
+  const reorderPeca = (fromIdx, toIdx) => {
+    if (fromIdx===toIdx) return
+    const arr = [...current.pecas]
+    const [moved] = arr.splice(fromIdx,1)
+    arr.splice(toIdx,0,moved)
+    upd('pecas', arr)
+  }
+
+  const renderPeca = (p, isB, idx) => {
     const mat = ANIGRACO[p.tipo]
     const matRef = mat?.materiais.find(m=>m.desc===p.desc&&m.grupo===p.grupo)||mat?.materiais.find(m=>m.desc===p.desc)
     const acabDisp = mat?.acabamentos||[]
@@ -224,8 +299,15 @@ function Calculadora({ current, setCurrent, onBack }) {
     const accentBorder = isB ? 'rgba(74,143,168,0.3)' : 'rgba(196,169,106,0.3)'
 
     return (
-      <div key={p.id} style={{background:'rgba(255,255,255,0.02)',border:`0.5px solid rgba(255,255,255,0.06)`,borderRadius:'10px',overflow:'hidden',marginBottom:'8px'}}>
-        <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0.6rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.05)'}}>
+      <div key={p.id}
+        draggable={!isB}
+        onDragStart={()=>!isB&&setDragPecaIdx(idx)}
+        onDragOver={e=>!isB&&e.preventDefault()}
+        onDrop={()=>{if(!isB&&dragPecaIdx!==null){reorderPeca(dragPecaIdx,idx);setDragPecaIdx(null)}}}
+        onDragEnd={()=>setDragPecaIdx(null)}
+        style={{background:'rgba(255,255,255,0.02)',border:`0.5px solid rgba(255,255,255,0.06)`,borderRadius:'10px',overflow:'hidden',marginBottom:'8px',opacity:dragPecaIdx===idx?0.35:1,transition:'opacity 0.15s'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0.6rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.05)',cursor:isB?'default':'grab'}}>
+          {!isB && <span style={{color:'rgba(255,255,255,0.15)',fontSize:'11px'}}>⠿</span>}
           <input value={p.label||''} onChange={e=>isB?updPecaB(p.id,'label',e.target.value):updPeca(p.id,'label',e.target.value)} style={{border:'none',background:'transparent',outline:'none',fontSize:'12px',fontWeight:500,color:accentColor,flex:1}}/>
           <button onClick={()=>setMatModal(isB?'B':p.id)} style={{...BTN(),height:'26px',fontSize:'11px',borderColor:accentBorder,color:accentColor}}>
             {p.desc||'Selecionar material'}
@@ -349,18 +431,18 @@ function Calculadora({ current, setCurrent, onBack }) {
           {/* Peças — modo simples ou comparação */}
           {!current.opcaoB ? (
             <>
-              {(current.pecas||[]).map(p=>renderPeca(p,false))}
+              {(current.pecas||[]).map((p,idx)=>renderPeca(p,false,idx))}
               <button onClick={addPeca} style={BTN_GOLD()}>+ Peça</button>
             </>
           ) : (
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
               <div>
                 <div style={{fontSize:'10px',fontWeight:600,color:'#C4A96A',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:'8px',padding:'6px 10px',background:'rgba(196,169,106,0.06)',borderRadius:'6px',border:'0.5px solid rgba(196,169,106,0.2)'}}>Opção A</div>
-                {(current.pecas||[]).map(p=>renderPeca(p,false))}
+                {(current.pecas||[]).map((p,idx)=>renderPeca(p,false,idx))}
               </div>
               <div>
                 <div style={{fontSize:'10px',fontWeight:600,color:'#4a8fa8',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:'8px',padding:'6px 10px',background:'rgba(74,143,168,0.06)',borderRadius:'6px',border:'0.5px solid rgba(74,143,168,0.2)'}}>Opção B</div>
-                {(current.opcaoB?.pecas||[]).map(p=>renderPeca(p,true))}
+                {(current.opcaoB?.pecas||[]).map((p,idx)=>renderPeca(p,true,idx))}
               </div>
             </div>
           )}

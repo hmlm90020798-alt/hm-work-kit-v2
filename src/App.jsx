@@ -1,10 +1,11 @@
 import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import './index.css'
 import Biblioteca from './pages/Biblioteca'
-import Categoria from './pages/Categoria'
 import Orcamento from './pages/Orcamento'
 import Tampos from './pages/Tampos'
 import Kits from './pages/Kits'
+import AuthGate, { LogoutButton } from './components/AuthGate'
+import MaoDeObra from './pages/MaoDeObra'
 
 const navSections = [
   {
@@ -39,20 +40,11 @@ function NavItemReset({ item }) {
   const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
 
   const handleClick = () => {
-    if (item.to === '/orcamento') {
-      // Só limpa se não vem da biblioteca com artigo pendente
-      const contexto = localStorage.getItem('orc_contexto')
-      if (!contexto) localStorage.removeItem('orc_ativo_id')
-      localStorage.removeItem('orc_contexto')
-    }
-    if (item.to === '/biblioteca') {
-      localStorage.removeItem('orc_contexto')
-    }
-    if (item.to === '/kits') {
-      const contexto = localStorage.getItem('kit_contexto')
-      if (!contexto) localStorage.removeItem('kit_ativo')
-      localStorage.removeItem('kit_contexto')
-    }
+    // Navegação via menu = sempre sair de qualquer fluxo de transferência ativo
+    localStorage.removeItem('orc_contexto')
+    localStorage.removeItem('kit_contexto')
+    if (item.to === '/orcamento') localStorage.removeItem('orc_ativo_id')
+    if (item.to === '/kits') localStorage.removeItem('kit_ativo')
     navigate(item.to)
   }
 
@@ -71,7 +63,7 @@ function NavItemReset({ item }) {
   )
 }
 
-function Sidebar() {
+function Sidebar({ user }) {
   return (
     <aside style={{
       width: '200px',
@@ -110,6 +102,11 @@ function Sidebar() {
           ))}
         </div>
       ))}
+      <div style={{flex:1}}/>
+      <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0.5rem',borderTop:'0.5px solid rgba(255,255,255,0.06)',marginTop:'0.5rem'}}>
+        <span style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.email}</span>
+        <LogoutButton />
+      </div>
     </aside>
   )
 }
@@ -124,16 +121,17 @@ function Placeholder({ label }) {
 
 function App() {
   return (
+    <AuthGate>
+      {(user) => (
     <BrowserRouter basename="/hm-work-kit-v2">
       <div style={{ display: 'flex', minHeight: '100vh' }}>
-        <Sidebar />
+        <Sidebar user={user} />
         <main style={{ flex: 1, overflow: 'auto' }}>
           <Routes>
             <Route path="/" element={<Placeholder label="Início" />} />
             <Route path="/biblioteca" element={<Biblioteca key="biblioteca" />} />
-            <Route path="/biblioteca/:nome" element={<Categoria />} />
             <Route path="/tampos" element={<Tampos />} />
-            <Route path="/mao-de-obra" element={<Placeholder label="Mão de obra" />} />
+            <Route path="/mao-de-obra" element={<MaoDeObra />} />
             <Route path="/bundles" element={<Placeholder label="Bundles" />} />
             <Route path="/kits" element={<Kits />} />
             <Route path="/projectos" element={<Placeholder label="Projectos" />} />
@@ -144,6 +142,8 @@ function App() {
         </main>
       </div>
     </BrowserRouter>
+      )}
+    </AuthGate>
   )
 }
 

@@ -2,29 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import CopyRef from '../components/CopyRef'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
-import { collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, doc, onSnapshot, setDoc, deleteDoc, addDoc, updateDoc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { corPorCategoria } from '../utils/corPorCategoria'
 
 const ICONES = {
   acessorios:'🔩', aquecimentoeconforto325:'🔥', caixilharia:'🪟',
   colas:'🎨', decoracao:'🪴', eletro:'⚡', ferragens:'🔧',
   iluminacao:'💡', limpeza:'🧹', materialpro:'📦',
   pavimentoerevestimento1694:'🟫', sanitarios:'🚿', tampos:'⬛',
-}
-const CORES = {
-  acessorios:'blue', aquecimentoeconforto325:'pink', caixilharia:'gray',
-  colas:'coral', decoracao:'purple', eletro:'amber', ferragens:'gray',
-  iluminacao:'amber', limpeza:'teal', materialpro:'teal',
-  pavimentoerevestimento1694:'green', sanitarios:'blue', tampos:'teal',
-}
-const COR_MAP = {
-  amber:  { bg:'rgba(196,169,106,0.12)', color:'#C4A96A', glow:'rgba(196,169,106,0.3)' },
-  blue:   { bg:'rgba(80,140,230,0.12)',  color:'#7aaff0', glow:'rgba(80,140,230,0.25)' },
-  gray:   { bg:'rgba(140,140,150,0.1)',  color:'rgba(255,255,255,0.45)', glow:'rgba(140,140,150,0.15)' },
-  coral:  { bg:'rgba(220,90,60,0.1)',    color:'#e8806a', glow:'rgba(220,90,60,0.2)' },
-  teal:   { bg:'rgba(40,190,140,0.1)',   color:'#4dcfaa', glow:'rgba(40,190,140,0.2)' },
-  green:  { bg:'rgba(80,190,80,0.1)',    color:'#78d878', glow:'rgba(80,190,80,0.2)' },
-  purple: { bg:'rgba(150,100,230,0.12)', color:'#b090e8', glow:'rgba(150,100,230,0.25)' },
-  pink:   { bg:'rgba(220,80,140,0.1)',   color:'#e080b8', glow:'rgba(220,80,140,0.2)' },
 }
 
 const SORT_OPTS = [
@@ -80,6 +65,7 @@ export default function Biblioteca() {
   const [refsNaSecao, setRefsNaSecao] = useState(new Set())
   const [refsNoKit, setRefsNoKit] = useState(new Set())
   const [cats, setCats]           = useState([])
+  const [dragCatIdx, setDragCatIdx] = useState(null)
   const [arts, setArts]           = useState([])
   const [activeCat, setActiveCat] = useState(null)
   const [activeSub, setActiveSub] = useState('')
@@ -90,6 +76,7 @@ export default function Biblioteca() {
   const [onlyStars, setOnlyStars] = useState(false)
   const [artModal, setArtModal]   = useState(false)
   const [catModal, setCatModal]   = useState(false)
+  const [catEditando, setCatEditando] = useState(null) // categoria a editar (subs) ou null=nova
   const [editId, setEditId]       = useState(null)
   const [form, setForm] = useState({ ref:'',desc:'',cat:'',sub:'',price:'',supplier:'',link:'',notes:'',star:false })
 
@@ -132,6 +119,16 @@ export default function Biblioteca() {
   }, [])
 
   const catsSorted = [...cats].sort((a,b)=>(a.order??999)-(b.order??999))
+
+  const reorderCats = async (fromIdx, toIdx) => {
+    if (fromIdx===toIdx) return
+    const novas = [...catsSorted]
+    const [moved] = novas.splice(fromIdx,1)
+    novas.splice(toIdx,0,moved)
+    const batch = writeBatch(db)
+    novas.forEach((c,i)=>batch.update(doc(db,'categorias',c.id),{order:i}))
+    await batch.commit()
+  }
   const activeCatObj = cats.find(c=>c.name===activeCat)
   const subs = activeCatObj?.subs?.length > 0 ? activeCatObj.subs : []
 
@@ -163,6 +160,31 @@ export default function Biblioteca() {
     setForm({ref:a.ref||'',desc:a.desc||'',cat:a.cat||'',sub:a.sub||'',price:a.price||'',supplier:a.supplier||'',link:a.link||'',notes:a.notes||'',star:a.star||false})
     setArtModal(true)
   }
+  const criarCategoria = async (nome, icone) => {
+    if (!nome.trim()) return
+    await addDoc(collection(db,'categorias'), { name: nome.trim(), icon: icone||'📦', order: catsSorted.length, subs: [] })
+    setCatModal(false)
+  }
+
+  const addSub = async (catId, subNome) => {
+    if (!subNome.trim()) return
+    const cat = cats.find(c=>c.id===catId)
+    const subs = [...(cat.subs||[]), subNome.trim()]
+    await updateDoc(doc(db,'categorias',catId), { subs })
+  }
+
+  const delSub = async (catId, subNome) => {
+    const cat = cats.find(c=>c.id===catId)
+    const subs = (cat.subs||[]).filter(s=>s!==subNome)
+    await updateDoc(doc(db,'categorias',catId), { subs })
+  }
+
+  const delCategoria = async (catId) => {
+    if (!confirm('Eliminar categoria? Os artigos já classificados nela ficam sem categoria.')) return
+    await deleteDoc(doc(db,'categorias',catId))
+    setCatEditando(null)
+  }
+
   const saveArt = async () => {
     const data = {...form, price: parseFloat(form.price)||0}
     if (editId) await updateDoc(doc(db,'artigos',editId), data)
@@ -183,7 +205,7 @@ export default function Biblioteca() {
 
   const addToKit = async (art) => {
     if (!kitContexto) return
-    const artigo = { ref: art.ref, desc: art.desc, preco: art.price||0, tipo: 'artigo' }
+    const artigo = { ref: art.ref, desc: art.desc, preco: art.price||0, tipo: 'artigo', link: art.link||'' }
     try {
       const kitRef = doc(db, 'kits', kitContexto.kitId)
       const snap = await getDoc(kitRef)
@@ -220,10 +242,10 @@ export default function Biblioteca() {
           if (!item.variantes) {
             // Converter item simples em item com variantes
             item.variantes = [
-              { ref: item.ref, desc: item.desc, preco: item.preco||0, supplier: item.supplier||'', ativa: true },
+              { ref: item.ref, desc: item.desc, preco: item.preco||0, supplier: item.supplier||'', link: item.link||'', ativa: true },
               { ...artigo, ativa: false }
             ]
-            delete item.ref; delete item.desc; delete item.preco; delete item.supplier
+            delete item.ref; delete item.desc; delete item.preco; delete item.supplier; delete item.link
           } else {
             item.variantes = [...item.variantes, { ...artigo, ativa: false }]
           }
@@ -344,14 +366,20 @@ export default function Biblioteca() {
               Categorias · {catsSorted.length} categorias
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:'10px',marginBottom:'1.5rem'}}>
-              {catsSorted.map(cat => {
-                const cor = CORES[cat.id]||'gray'
-                const c = COR_MAP[cor]
+              {catsSorted.map((cat,catIdx) => {
+                const c = corPorCategoria(cat.name)
                 return (
-                  <div key={cat.id} onClick={()=>entrarCat(cat.name)} style={{background:'rgba(255,255,255,0.04)',backdropFilter:'blur(12px)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'1rem 0.875rem',cursor:'pointer',position:'relative',overflow:'hidden',transition:'all 0.2s'}}
+                  <div key={cat.id} onClick={()=>entrarCat(cat.name)}
+                    draggable
+                    onDragStart={()=>setDragCatIdx(catIdx)}
+                    onDragOver={e=>e.preventDefault()}
+                    onDrop={()=>{if(dragCatIdx!==null){reorderCats(dragCatIdx,catIdx);setDragCatIdx(null)}}}
+                    onDragEnd={()=>setDragCatIdx(null)}
+                    style={{background:'rgba(255,255,255,0.04)',backdropFilter:'blur(12px)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'1rem 0.875rem',cursor:'grab',position:'relative',overflow:'hidden',transition:'all 0.2s',opacity:dragCatIdx===catIdx?0.35:1}}
                     onMouseEnter={e=>{e.currentTarget.style.borderColor='rgba(196,169,106,0.3)';e.currentTarget.style.background='rgba(255,255,255,0.07)'}}
                     onMouseLeave={e=>{e.currentTarget.style.borderColor='rgba(255,255,255,0.08)';e.currentTarget.style.background='rgba(255,255,255,0.04)'}}>
                     <div style={{position:'absolute',top:0,left:0,right:0,height:'1px',background:'linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent)'}}/>
+                    <button onClick={e=>{e.stopPropagation();setCatEditando(cat)}} style={{position:'absolute',top:'8px',right:'8px',background:'rgba(0,0,0,0.3)',border:'none',borderRadius:'6px',color:'rgba(255,255,255,0.4)',fontSize:'11px',padding:'3px 6px',cursor:'pointer'}}>✎</button>
                     <div style={{width:'36px',height:'36px',borderRadius:'8px',background:c.bg,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'0.75rem',fontSize:'18px',boxShadow:`0 0 14px ${c.glow}`}}>
                       {cat.icon || ICONES[cat.id] || '📦'}
                     </div>
@@ -388,6 +416,18 @@ export default function Biblioteca() {
       </div>
 
       {/* MODAL ARTIGO */}
+      {catModal && <NovaCategoriaModal onSave={criarCategoria} onClose={()=>setCatModal(false)} />}
+
+      {catEditando && (
+        <EditarCategoriaModal
+          cat={cats.find(c=>c.id===catEditando.id) || catEditando}
+          onAddSub={(nome)=>addSub(catEditando.id,nome)}
+          onDelSub={(nome)=>delSub(catEditando.id,nome)}
+          onDelCategoria={()=>delCategoria(catEditando.id)}
+          onClose={()=>setCatEditando(null)}
+        />
+      )}
+
       {artModal && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(4px)'}}>
           <div style={{background:'#161618',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'16px',padding:'1.5rem',width:'480px',maxWidth:'90vw',maxHeight:'85vh',overflowY:'auto'}}>
@@ -465,6 +505,8 @@ function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, kitCont
   return (
     <div
       onClick={()=>setOpen(!open)}
+      onMouseEnter={e=>{ if(!jaAdicionado) e.currentTarget.style.background='rgba(255,255,255,0.065)' }}
+      onMouseLeave={e=>{ e.currentTarget.style.background = jaAdicionado ? 'rgba(77,207,170,0.04)' : open ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)' }}
       style={{
         background: jaAdicionado ? 'rgba(77,207,170,0.04)' : open ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
         border: isStar
@@ -475,7 +517,7 @@ function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, kitCont
         borderRadius:'10px',
         padding:'0.75rem 1rem',
         cursor:'pointer',
-        transition:'all 0.15s',
+        transition:'background 0.1s, border-color 0.15s',
         boxShadow: isStar ? '0 0 12px rgba(240,192,64,0.12), inset 0 0 20px rgba(240,192,64,0.04)' : 'none',
         position:'relative',
         overflow:'hidden',
@@ -524,6 +566,81 @@ function CardArtigo({ art, onEdit, onDel, onStar, orcContexto, onAddOrc, kitCont
           {art.notes && <div style={{fontSize:'12px',color:'rgba(255,255,255,0.45)',lineHeight:1.6}}><Highlight text={art.notes} query={search}/></div>}
         </div>
       )}
+    </div>
+  )
+}
+
+function NovaCategoriaModal({ onSave, onClose }) {
+  const [nome, setNome] = useState('')
+  const [icone, setIcone] = useState('📦')
+  const ICONES_SUGERIDOS = ['📦','🔧','💡','🚿','🪟','🎨','🧹','🔥','🪴','⬛','🔩','🟫']
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(4px)'}}>
+      <div style={{background:'#161618',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'16px',padding:'1.5rem',width:'400px',maxWidth:'90vw'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'1.25rem'}}>
+          <span style={{fontSize:'14px',fontWeight:500,color:'rgba(255,255,255,0.85)'}}>Nova categoria</span>
+          <button onClick={onClose} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'18px',cursor:'pointer'}}>✕</button>
+        </div>
+        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.35)',marginBottom:'4px'}}>Nome</div>
+        <input
+          value={nome}
+          onChange={e=>setNome(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&onSave(nome,icone)}
+          placeholder="ex: Iluminação Exterior"
+          autoFocus
+          style={{background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'0 0.75rem',height:'36px',fontSize:'13px',color:'rgba(255,255,255,0.8)',outline:'none',width:'100%'}}
+        />
+        <div style={{fontSize:'11px',color:'rgba(255,255,255,0.35)',margin:'12px 0 6px'}}>Ícone</div>
+        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+          {ICONES_SUGERIDOS.map(ic=>(
+            <button key={ic} onClick={()=>setIcone(ic)} style={{width:'34px',height:'34px',borderRadius:'8px',border:icone===ic?'0.5px solid rgba(196,169,106,0.5)':'0.5px solid rgba(255,255,255,0.08)',background:icone===ic?'rgba(196,169,106,0.12)':'rgba(255,255,255,0.03)',fontSize:'16px',cursor:'pointer'}}>{ic}</button>
+          ))}
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:'8px',marginTop:'1.25rem'}}>
+          <button onClick={onClose} style={{height:'32px',padding:'0 0.875rem',borderRadius:'8px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',fontSize:'12px',color:'rgba(255,255,255,0.55)',cursor:'pointer'}}>Cancelar</button>
+          <button onClick={()=>onSave(nome,icone)} style={{height:'32px',padding:'0 0.875rem',borderRadius:'8px',border:'0.5px solid rgba(196,169,106,0.35)',background:'rgba(196,169,106,0.12)',fontSize:'12px',color:'#C4A96A',cursor:'pointer'}}>Criar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditarCategoriaModal({ cat, onAddSub, onDelSub, onDelCategoria, onClose }) {
+  const [novaSub, setNovaSub] = useState('')
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(4px)'}}>
+      <div style={{background:'#161618',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'16px',padding:'1.5rem',width:'420px',maxWidth:'90vw',maxHeight:'80vh',display:'flex',flexDirection:'column',gap:'10px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <span style={{fontSize:'14px',fontWeight:500,color:'rgba(255,255,255,0.85)'}}>{cat.name}</span>
+          <button onClick={onClose} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.4)',fontSize:'18px',cursor:'pointer'}}>✕</button>
+        </div>
+
+        <div style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',letterSpacing:'0.06em',textTransform:'uppercase',marginTop:'4px'}}>Subcategorias</div>
+        <div style={{display:'flex',flexDirection:'column',gap:'4px',maxHeight:'240px',overflowY:'auto'}}>
+          {(cat.subs||[]).length===0 && <div style={{fontSize:'12px',color:'rgba(255,255,255,0.25)',padding:'0.5rem 0'}}>Nenhuma subcategoria ainda.</div>}
+          {(cat.subs||[]).map(sub=>(
+            <div key={sub} style={{display:'flex',alignItems:'center',gap:'8px',padding:'0.5rem 0.75rem',background:'rgba(255,255,255,0.03)',border:'0.5px solid rgba(255,255,255,0.06)',borderRadius:'8px'}}>
+              <span style={{flex:1,fontSize:'12.5px',color:'rgba(255,255,255,0.75)'}}>{sub}</span>
+              <button onClick={()=>onDelSub(sub)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'13px'}}>✕</button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{display:'flex',gap:'8px',marginTop:'4px'}}>
+          <input
+            value={novaSub}
+            onChange={e=>setNovaSub(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter'){onAddSub(novaSub);setNovaSub('')}}}
+            placeholder="Nova subcategoria..."
+            style={{flex:1,background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'8px',padding:'0 0.75rem',height:'34px',fontSize:'12px',color:'rgba(255,255,255,0.8)',outline:'none'}}
+          />
+          <button onClick={()=>{onAddSub(novaSub);setNovaSub('')}} style={{height:'34px',padding:'0 0.875rem',borderRadius:'8px',border:'0.5px solid rgba(196,169,106,0.35)',background:'rgba(196,169,106,0.12)',fontSize:'12px',color:'#C4A96A',cursor:'pointer'}}>+ Adicionar</button>
+        </div>
+
+        <div style={{borderTop:'0.5px solid rgba(255,255,255,0.06)',paddingTop:'12px',marginTop:'8px'}}>
+          <button onClick={onDelCategoria} style={{width:'100%',height:'34px',borderRadius:'8px',border:'0.5px solid rgba(255,100,100,0.2)',background:'rgba(255,100,100,0.06)',fontSize:'12px',color:'rgba(255,100,100,0.6)',cursor:'pointer'}}>Eliminar categoria</button>
+        </div>
+      </div>
     </div>
   )
 }

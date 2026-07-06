@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase/config'
 import { collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore'
 import CopyRef from '../components/CopyRef'
+import { corPorNome } from '../utils/corPorNome'
 
 const BTN = (extra={}) => ({
   height:'32px', padding:'0 0.875rem', borderRadius:'8px',
@@ -86,12 +87,15 @@ export default function Kits() {
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'10px'}}>
             {kits.map(kit=>(
               <div key={kit.id} onClick={()=>setKit(kit)}
-                style={{background:'rgba(255,255,255,0.03)',backdropFilter:'blur(12px)',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'12px',padding:'1.25rem',cursor:'pointer',transition:'all 0.15s',position:'relative',overflow:'hidden'}}
+                style={{background:'rgba(255,255,255,0.03)',backdropFilter:'blur(12px)',border:'0.5px solid rgba(255,255,255,0.07)',borderLeft:`2px solid ${corPorNome(kit.nome).color}`,borderRadius:'12px',padding:'1.25rem',cursor:'pointer',transition:'all 0.15s',position:'relative',overflow:'hidden'}}
                 onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.06)';e.currentTarget.style.borderColor='rgba(196,169,106,0.25)'}}
                 onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.03)';e.currentTarget.style.borderColor='rgba(255,255,255,0.07)'}}
               >
                 <div style={{position:'absolute',top:0,left:0,right:0,height:'1px',background:'linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent)'}}/>
-                <div style={{fontSize:'14px',fontWeight:500,color:'rgba(255,255,255,0.85)',marginBottom:'6px'}}>{kit.nome}</div>
+                <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                  <span style={{width:'8px',height:'8px',borderRadius:'50%',background:corPorNome(kit.nome).color,boxShadow:`0 0 6px ${corPorNome(kit.nome).glow}`,flexShrink:0}}/>
+                  <span style={{fontSize:'14px',fontWeight:500,color:'rgba(255,255,255,0.85)'}}>{kit.nome}</span>
+                </div>
                 <div style={{fontSize:'11px',color:'rgba(255,255,255,0.3)',marginBottom:'0.875rem'}}>{(kit.itens||[]).length} itens</div>
                 <div style={{display:'flex',flexDirection:'column',gap:'3px',maxHeight:'80px',overflow:'hidden'}}>
                   {(kit.itens||[]).slice(0,3).map((item,i)=>(
@@ -132,11 +136,17 @@ export default function Kits() {
 function KitDetalhe({ kit, onVoltar }) {
   const navigate = useNavigate()
   const [novoItem, setNovoItem] = useState({ ref:'', desc:'', preco:'', tipo:'artigo' })
+  const [dragIdx, setDragIdx] = useState(null)
   const [editIdx, setEditIdx] = useState(null)
   const [aplicarModal, setAplicarModal] = useState(false)
 
   const saveItens = async (itens) => {
     await updateDoc(doc(db,'kits',kit.id), { itens })
+  }
+
+  const irMaoDeObra = () => {
+    localStorage.setItem('kit_contexto', JSON.stringify({ kitId: kit.id, kitNome: kit.nome }))
+    navigate('/mao-de-obra')
   }
 
   const irBiblioteca = () => {
@@ -151,6 +161,14 @@ function KitDetalhe({ kit, onVoltar }) {
     setNovoItem({ ref:'', desc:'', preco:'', tipo:'artigo' })
   }
 
+  const reorderItem = async (fromIdx, toIdx) => {
+    if (fromIdx===toIdx) return
+    const itens = [...(kit.itens||[])]
+    const [moved] = itens.splice(fromIdx,1)
+    itens.splice(toIdx,0,moved)
+    await saveItens(itens)
+  }
+
   const delItem = async (idx) => {
     await saveItens((kit.itens||[]).filter((_,i)=>i!==idx))
   }
@@ -161,7 +179,10 @@ function KitDetalhe({ kit, onVoltar }) {
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
       <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0 1.25rem',height:'52px',borderBottom:'0.5px solid rgba(255,255,255,0.06)',flexShrink:0,background:'rgba(13,13,15,0.95)'}}>
         <button onClick={onVoltar} style={BTN()}>← Kits</button>
-        <div style={{flex:1,fontSize:'13px',fontWeight:500,color:'rgba(255,255,255,0.8)'}}>{kit.nome}</div>
+        <div style={{flex:1,display:'flex',alignItems:'center',gap:'8px'}}>
+          <span style={{width:'8px',height:'8px',borderRadius:'50%',background:corPorNome(kit.nome).color,flexShrink:0}}/>
+          <span style={{fontSize:'13px',fontWeight:500,color:'rgba(255,255,255,0.8)'}}>{kit.nome}</span>
+        </div>
         <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{(kit.itens||[]).length} itens</span>
         {totalKit>0 && <span style={{fontSize:'14px',fontWeight:500,color:'#C4A96A'}}>{totalKit.toFixed(2)} €</span>}
         <button onClick={()=>setAplicarModal(true)} style={BTN_GOLD()}>↗ Aplicar ao orçamento</button>
@@ -177,13 +198,25 @@ function KitDetalhe({ kit, onVoltar }) {
         ) : (
           <div style={{display:'flex',flexDirection:'column',gap:'4px',marginBottom:'1.5rem'}}>
             {(kit.itens||[]).map((item,idx)=>(
-              <div key={idx} style={{display:'grid',gridTemplateColumns:'auto 1fr auto auto',alignItems:'center',gap:'10px',padding:'0.625rem 1rem',background:'rgba(255,255,255,0.03)',border:'0.5px solid rgba(255,255,255,0.06)',borderRadius:'8px'}}>
+              <div key={idx}
+                draggable
+                onDragStart={()=>setDragIdx(idx)}
+                onDragOver={e=>e.preventDefault()}
+                onDrop={()=>{if(dragIdx!==null){reorderItem(dragIdx,idx);setDragIdx(null)}}}
+                onDragEnd={()=>setDragIdx(null)}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.06)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,0.03)'}
+                style={{display:'grid',gridTemplateColumns:'14px auto 1fr auto auto',alignItems:'center',gap:'10px',padding:'0.625rem 1rem',background:'rgba(255,255,255,0.03)',border:'0.5px solid rgba(255,255,255,0.06)',borderRadius:'8px',cursor:'grab',opacity:dragIdx===idx?0.35:1,transition:'opacity 0.15s, background 0.1s'}}>
+                <span style={{color:'rgba(255,255,255,0.12)',fontSize:'11px'}}>⠿</span>
                 <span style={{fontSize:'10px',padding:'2px 6px',borderRadius:'4px',background:item.tipo==='mao-de-obra'?'rgba(80,140,230,0.1)':'rgba(196,169,106,0.08)',color:item.tipo==='mao-de-obra'?'#7aaff0':'rgba(196,169,106,0.7)',whiteSpace:'nowrap'}}>
                   {item.tipo==='mao-de-obra'?'M.O.':'Artigo'}
                 </span>
                 <div>
                   <div style={{fontSize:'12.5px',color:'rgba(255,255,255,0.78)',marginBottom:'2px'}}>{item.desc}</div>
-                  {item.ref && <CopyRef refCode={item.ref} />}
+                  <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                    {item.ref && <CopyRef refCode={item.ref} />}
+                    {item.link && <a href={item.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',textDecoration:'none',padding:'2px 6px',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'5px'}}>↗</a>}
+                  </div>
                 </div>
                 {item.preco>0 && <span style={{fontSize:'12px',fontWeight:500,color:'#C4A96A',whiteSpace:'nowrap'}}>{item.preco.toFixed(2)} €</span>}
                 <button onClick={()=>delItem(idx)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'13px',padding:'4px'}}>✕</button>
@@ -205,6 +238,11 @@ function KitDetalhe({ kit, onVoltar }) {
             {novoItem.tipo==='artigo' && (
               <button onClick={irBiblioteca} style={{...BTN(),height:'28px',fontSize:'11px',marginLeft:'auto'}}>
                 🔍 Pesquisar na Biblioteca
+              </button>
+            )}
+            {novoItem.tipo==='mao-de-obra' && (
+              <button onClick={irMaoDeObra} style={{...BTN(),height:'28px',fontSize:'11px',marginLeft:'auto'}}>
+                🔍 Pesquisar em Mão de Obra
               </button>
             )}
           </div>
