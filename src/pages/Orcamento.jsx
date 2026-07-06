@@ -320,7 +320,7 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
           {orc.pc&&<span style={{marginLeft:'8px',fontSize:'11px',color:'rgba(196,169,106,0.7)',fontFamily:'monospace'}}>PC {orc.pc}</span>}
         </div>
         <span style={{fontSize:'15px',fontWeight:500,color:'#C4A96A'}}>{total.toFixed(2)} €</span>
-        <button style={BTN_GOLD()}>↗ Proposta</button>
+        <button onClick={()=>{localStorage.setItem('proposta_orc_id',orc.id);navigate('/proposta')}} style={BTN_GOLD()}>↗ Proposta</button>
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',padding:'1rem 1.25rem',borderBottom:'0.5px solid rgba(255,255,255,0.05)',flexShrink:0}}>
@@ -355,13 +355,13 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
                   {(()=>{const total=(secao.itens||[]).length,cop=(secao.itens||[]).filter(i=>i.copiado).length
                     return total>0 && <span style={{fontSize:'10px',color:cop===total?'#4dcfaa':'rgba(255,255,255,0.3)',background:cop===total?'rgba(77,207,170,0.1)':'rgba(255,255,255,0.04)',padding:'2px 8px',borderRadius:'20px'}}>{cop}/{total} copiados</span>})()}
                   {(secao.itens||[]).some(i=>i.copiado) && (
-                    <button onClick={()=>resetCopiados(secao.id)} title="Reiniciar marcações de cópia" style={{background:'transparent',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:'rgba(255,255,255,0.35)',fontSize:'10px',padding:'3px 8px',cursor:'pointer'}}>↺ reset</button>
+                    <button tabIndex={-1} onClick={()=>resetCopiados(secao.id)} title="Reiniciar marcações de cópia" style={{background:'transparent',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'6px',color:'rgba(255,255,255,0.35)',fontSize:'10px',padding:'3px 8px',cursor:'pointer'}}>↺ reset</button>
                   )}
                   <span style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>{(secao.itens||[]).length} itens</span>
                   <span style={{fontSize:'12px',fontWeight:500,color:'#C4A96A',marginLeft:'8px'}}>
                     {(secao.itens||[]).reduce((t,i)=>t+(i.preco||0)*(i.qty||1),0).toFixed(2)} €
                   </span>
-                  <button onClick={()=>delSecao(secao.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px',padding:'2px 6px'}}>✕</button>
+                  <button tabIndex={-1} onClick={()=>delSecao(secao.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px',padding:'2px 6px'}}>✕</button>
                 </div>
 
                 <div style={{padding:'8px 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.04)',display:'flex',gap:'8px'}}>
@@ -463,27 +463,28 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
                               <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
                                 <CopyRef refCode={ativa.ref||item.ref} marcado={item.copiado} onCopy={()=>marcarCopiado(secao.id,idx)} />
                                 {(ativa.link||item.link) && (
-                                  <a href={ativa.link||item.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',textDecoration:'none',padding:'2px 6px',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'5px'}}>↗</a>
+                                  <a href={ativa.link||item.link} target="_blank" rel="noreferrer" tabIndex={-1} onClick={e=>e.stopPropagation()} style={{fontSize:'10px',color:'rgba(255,255,255,0.3)',textDecoration:'none',padding:'2px 6px',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'5px'}}>↗</a>
                                 )}
                                 {item.cat && <span style={{fontSize:'9px',padding:'1px 6px',borderRadius:'20px',background:corCat.bg,color:corCat.color}}>{item.cat}</span>}
                                 {temVariantes && <span style={{fontSize:'10px',padding:'1px 6px',borderRadius:'20px',background:'rgba(196,169,106,0.1)',color:'#C4A96A'}}>A/B</span>}
                               </div>
                             </div>
                             <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
-                              <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)-1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                              <button tabIndex={-1} onClick={()=>updateQty(secao.id,idx,(item.qty||1)-1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
                               <input
                                 type="number"
                                 value={item.qty||1}
                                 min={1}
                                 onClick={e=>e.stopPropagation()}
+                                onFocus={e=>e.target.select()}
                                 onChange={e=>updateQty(secao.id,idx,parseInt(e.target.value)||1)}
                                 style={{width:'34px',height:'22px',background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'4px',color:'rgba(255,255,255,0.75)',fontSize:'12px',textAlign:'center',outline:'none'}}
                               />
-                              <button onClick={()=>updateQty(secao.id,idx,(item.qty||1)+1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                              <button tabIndex={-1} onClick={()=>updateQty(secao.id,idx,(item.qty||1)+1)} style={{width:'22px',height:'22px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.5)',cursor:'pointer',fontSize:'14px',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
                             </div>
                             <span style={{fontSize:'12px',fontWeight:500,color:'#C4A96A',textAlign:'right'}}>{((ativa.preco||item.preco||0)*(item.qty||1)).toFixed(2)} €</span>
-                            <button onClick={()=>irBibliotecaVariante(secao,idx)} style={{height:'22px',padding:'0 6px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.03)',fontSize:'10px',color:'rgba(255,255,255,0.35)',cursor:'pointer',whiteSpace:'nowrap'}}>+ Variante</button>
-                            <button onClick={()=>delItem(secao.id,idx)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'13px',textAlign:'center'}}>✕</button>
+                            <button tabIndex={-1} onClick={()=>irBibliotecaVariante(secao,idx)} style={{height:'22px',padding:'0 6px',borderRadius:'4px',border:'0.5px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.03)',fontSize:'10px',color:'rgba(255,255,255,0.35)',cursor:'pointer',whiteSpace:'nowrap'}}>+ Variante</button>
+                            <button tabIndex={-1} onClick={()=>delItem(secao.id,idx)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.35)',fontSize:'13px',textAlign:'center'}}>✕</button>
                           </div>
                           {/* Variantes A/B */}
                           {temVariantes && item.variantes.map((v,vi)=>(
@@ -494,12 +495,12 @@ function OrcamentoDetalhe({ orc, onVoltar }) {
                                   <div style={{fontSize:'11.5px',color:v.ativa?'rgba(255,255,255,0.75)':'rgba(255,255,255,0.35)'}}>{v.desc}</div>
                                   <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
                                     <CopyRef refCode={v.ref} style={{fontSize:'10px'}} />
-                                    {v.link && <a href={v.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',textDecoration:'none',padding:'2px 5px',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'4px'}}>↗</a>}
+                                    {v.link && <a href={v.link} target="_blank" rel="noreferrer" tabIndex={-1} onClick={e=>e.stopPropagation()} style={{fontSize:'9px',color:'rgba(255,255,255,0.25)',textDecoration:'none',padding:'2px 5px',border:'0.5px solid rgba(255,255,255,0.07)',borderRadius:'4px'}}>↗</a>}
                                   </div>
                                 </div>
                               </div>
                               <span style={{fontSize:'12px',fontWeight:500,color:v.ativa?'#4dcfaa':'rgba(255,255,255,0.3)',textAlign:'right'}}>{(v.preco||0).toFixed(2)} €</span>
-                              <button onClick={e=>{e.stopPropagation();delVariante(secao.id,idx,vi)}} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'12px',textAlign:'center'}}>✕</button>
+                              <button tabIndex={-1} onClick={e=>{e.stopPropagation();delVariante(secao.id,idx,vi)}} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'12px',textAlign:'center'}}>✕</button>
                             </div>
                           ))}
                         </div>

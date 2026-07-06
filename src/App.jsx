@@ -5,6 +5,7 @@ import Orcamento from './pages/Orcamento'
 import Tampos from './pages/Tampos'
 import Kits from './pages/Kits'
 import AuthGate, { LogoutButton } from './components/AuthGate'
+import Proposta from './pages/Proposta'
 import MaoDeObra from './pages/MaoDeObra'
 
 const navSections = [
@@ -65,7 +66,7 @@ function NavItemReset({ item }) {
 
 function Sidebar({ user }) {
   return (
-    <aside style={{
+    <aside className="no-print" style={{
       width: '200px',
       flexShrink: 0,
       padding: '1.25rem 0.75rem',
@@ -136,7 +137,7 @@ function App() {
             <Route path="/kits" element={<Kits />} />
             <Route path="/projectos" element={<Placeholder label="Projectos" />} />
             <Route path="/orcamento" element={<Orcamento />} />
-            <Route path="/proposta" element={<Placeholder label="Proposta" />} />
+            <Route path="/proposta" element={<Proposta />} />
             <Route path="/kc" element={<Placeholder label="KC" />} />
           </Routes>
         </main>

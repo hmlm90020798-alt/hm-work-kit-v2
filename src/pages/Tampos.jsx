@@ -309,7 +309,7 @@ function Calculadora({ current, setCurrent, onBack }) {
         <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'0.6rem 1rem',borderBottom:'0.5px solid rgba(255,255,255,0.05)',cursor:isB?'default':'grab'}}>
           {!isB && <span style={{color:'rgba(255,255,255,0.15)',fontSize:'11px'}}>⠿</span>}
           <input value={p.label||''} onChange={e=>isB?updPecaB(p.id,'label',e.target.value):updPeca(p.id,'label',e.target.value)} style={{border:'none',background:'transparent',outline:'none',fontSize:'12px',fontWeight:500,color:accentColor,flex:1}}/>
-          <button onClick={()=>setMatModal(isB?'B':p.id)} style={{...BTN(),height:'26px',fontSize:'11px',borderColor:accentBorder,color:accentColor}}>
+          <button tabIndex={-1} onClick={()=>setMatModal(isB?'B':p.id)} style={{...BTN(),height:'26px',fontSize:'11px',borderColor:accentBorder,color:accentColor}}>
             {p.desc||'Selecionar material'}
           </button>
           {matRef?.espessuras && (
@@ -319,7 +319,7 @@ function Calculadora({ current, setCurrent, onBack }) {
           )}
           <span style={{fontSize:'11px',color:'rgba(255,255,255,0.3)'}}>{f2(res.m2)} m²</span>
           <span style={{fontSize:'13px',fontWeight:500,color:accentColor}}>{f2(res.pvp)} €</span>
-          {!isB && current.pecas.length>1 && <button onClick={()=>delPeca(p.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px'}}>✕</button>}
+          {!isB && current.pecas.length>1 && <button tabIndex={-1} onClick={()=>delPeca(p.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px'}}>✕</button>}
         </div>
 
         <div style={{padding:'0.75rem 1rem'}}>
@@ -330,10 +330,10 @@ function Calculadora({ current, setCurrent, onBack }) {
               <input type="number" value={seg.comp||''} onChange={e=>isB?null:updSeg(p.id,seg.id,'comp',e.target.value)} placeholder="Comp. (m)" step="0.01" style={{...INPUT,height:'38px',fontSize:'13px',fontWeight:500,textAlign:'right'}}/>
               <input type="number" value={seg.larg||''} onChange={e=>isB?null:updSeg(p.id,seg.id,'larg',e.target.value)} placeholder="Larg. (m)" step="0.01" style={{...INPUT,height:'38px',fontSize:'13px',fontWeight:500,textAlign:'right'}}/>
               <div style={{textAlign:'right',fontSize:'15px',fontWeight:600,color:accentColor}}>{f2((parseFloat(seg.comp)||0)*(parseFloat(seg.larg)||0))}</div>
-              {(p.segmentos||[]).length>1&&!isB&&<button onClick={()=>delSeg(p.id,seg.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px'}}>✕</button>}
+              {(p.segmentos||[]).length>1&&!isB&&<button tabIndex={-1} onClick={()=>delSeg(p.id,seg.id)} style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,100,100,0.3)',fontSize:'13px'}}>✕</button>}
             </div>
           ))}
-          {!isB && <button onClick={()=>addSeg(p.id)} style={{...BTN(),height:'24px',fontSize:'10px',marginTop:'4px'}}>+ Seg.</button>}
+          {!isB && <button tabIndex={-1} onClick={()=>addSeg(p.id)} style={{...BTN(),height:'24px',fontSize:'10px',marginTop:'4px'}}>+ Seg.</button>}
 
           {/* Acabamentos */}
           {acabDisp.length>0 && (
