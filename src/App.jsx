@@ -6,6 +6,7 @@ import Tampos from './pages/Tampos'
 import Kits from './pages/Kits'
 import AuthGate, { LogoutButton } from './components/AuthGate'
 import Proposta from './pages/Proposta'
+import Processos from './pages/Processos'
 import MaoDeObra from './pages/MaoDeObra'
 
 const navSections = [
@@ -15,7 +16,7 @@ const navSections = [
       { to: '/biblioteca', label: 'Biblioteca' },
       { to: '/tampos', label: 'Tampos' },
       { to: '/mao-de-obra', label: 'Mão de obra' },
-      { to: '/bundles', label: 'Bundles' },
+      { to: '/processos', label: 'Processos' },
       { to: '/kits', label: 'Kits' },
     ]
   },
@@ -133,7 +134,7 @@ function App() {
             <Route path="/biblioteca" element={<Biblioteca key="biblioteca" />} />
             <Route path="/tampos" element={<Tampos />} />
             <Route path="/mao-de-obra" element={<MaoDeObra />} />
-            <Route path="/bundles" element={<Placeholder label="Bundles" />} />
+            <Route path="/processos" element={<Processos />} />
             <Route path="/kits" element={<Kits />} />
             <Route path="/projectos" element={<Placeholder label="Projectos" />} />
             <Route path="/orcamento" element={<Orcamento />} />
